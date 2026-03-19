@@ -1,0 +1,1998 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>教室予約状況</title>
+<style>
+/* ===== RESET ===== */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body {
+  font-family: "Meiryo", "Yu Gothic", "Hiragino Kaku Gothic ProN", sans-serif;
+  font-size: 14px;
+  background: #f5f5f0;
+  color: #333;
+  height: 100%;
+}
+
+/* ===== PAGE HEADER ===== */
+.page-header {
+  background: linear-gradient(135deg, #7a5c2e 0%, #9b7a42 100%);
+  color: #fff;
+  padding: 10px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+}
+.page-header h1 { font-size: 17px; font-weight: bold; white-space: nowrap; }
+
+/* ===== MAIN LAYOUT ===== */
+.main-wrap { padding: 10px 12px; }
+
+/* TOP ROW */
+.top-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+.top-row .status-bar { flex: 1; margin-bottom: 0; }
+.left-section { min-width: 0; }
+
+/* ===== STATUS BAR ===== */
+.status-bar {
+  background: #f5f0e8;
+  border: 1px solid #c8b88a;
+  border-radius: 6px;
+  padding: 8px 12px;
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.status-date { font-size: 16px; font-weight: bold; color: #5c3d1a; }
+.nav-btns { display: flex; gap: 4px; flex-wrap: wrap; }
+.nav-btn {
+  background: #fff; border: 1px solid #9b7a42;
+  border-radius: 4px; padding: 5px 12px;
+  cursor: pointer; font-size: 13px; color: #5c3d1a;
+  white-space: nowrap; font-family: inherit;
+}
+.nav-btn:hover { background: #f0e8d8; }
+.nav-btn:active { background: #e0d0b0; }
+
+/* ===== ACTION BAR ===== */
+.action-bar {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+  padding: 6px 10px;
+  background: #eef3ff;
+  border: 1px solid #b8cce8;
+  border-radius: 6px;
+  align-items: center;
+}
+.action-bar-label {
+  font-size: 12px;
+  font-weight: bold;
+  color: #1a4b8a;
+  white-space: nowrap;
+}
+.btn-download {
+  background: #1d6b3a; color: #fff;
+  border: none; border-radius: 4px;
+  padding: 6px 14px; font-size: 13px;
+  cursor: pointer; font-family: inherit;
+  white-space: nowrap; font-weight: bold;
+}
+.btn-download:hover { background: #14502b; }
+.btn-download:active { background: #0e3b20; }
+.btn-occ {
+  background: #1a4b8a; color: #fff;
+  border: none; border-radius: 4px;
+  padding: 6px 14px; font-size: 13px;
+  cursor: pointer; font-family: inherit;
+  white-space: nowrap; font-weight: bold;
+}
+.btn-occ:hover { background: #13386b; }
+.btn-occ:active { background: #0d2950; }
+
+/* ===== LEGEND ===== */
+.legend-bar {
+  display: flex; align-items: center;
+  gap: 12px; padding: 6px 0; margin-bottom: 6px;
+  flex-wrap: wrap;
+}
+.legend-item { display: flex; align-items: center; gap: 5px; font-size: 12px; }
+.legend-box {
+  width: 26px; height: 15px; border-radius: 3px;
+  border: 1px solid rgba(0,0,0,0.15); flex-shrink: 0;
+}
+.leg-pt    { background: #2563eb; }
+.leg-ot    { background: #f97316; }
+.leg-jimu  { background: #16a34a; }
+.leg-other { background: #9ca3af; }
+.legend-note { font-size: 11px; color: #cc3300; }
+
+/* ===== GANTT CONTAINER (Single-scroll, sticky header+column) ===== */
+.gantt-container {
+  border: 1px solid #c8b88a;
+  border-radius: 6px;
+  overflow: auto;
+  max-height: calc(100vh - 260px);
+  min-height: 200px;
+  background: #fff;
+  -webkit-overflow-scrolling: touch;
+  position: relative;
+}
+
+/* CSS Grid: column 1 = room names (sticky left), columns 2..N = hours */
+.gantt-grid {
+  display: grid;
+  /* grid-template-columns set dynamically in JS */
+}
+
+/* Top-left corner cell: sticky both axes */
+.gc-corner {
+  position: sticky; left: 0; top: 0;
+  z-index: 10;
+  background: #7a5c2e; color: #fff;
+  display: flex; align-items: center;
+  padding: 0 8px;
+  font-weight: bold; font-size: 12px;
+  height: 48px;
+  border-bottom: 1px solid #9b7a42;
+  border-right: 2px solid #9b7a42;
+  white-space: nowrap;
+}
+
+/* Period label cells in header row: sticky top */
+.gc-hour {
+  position: sticky; top: 0;
+  z-index: 8;
+  background: #7a5c2e; color: #fff;
+  font-size: 11px; font-weight: bold;
+  padding: 2px 4px;
+  display: flex; align-items: center; justify-content: center;
+  flex-direction: column;
+  height: 48px;
+  border-bottom: 1px solid #9b7a42;
+  border-left: 1px solid rgba(255,255,255,0.3);
+  text-align: center;
+  white-space: nowrap;
+}
+.gc-hour-time { font-size: 9px; font-weight: normal; opacity: 0.85; margin-top: 2px; }
+
+/* Break / gap column header */
+.gc-break {
+  position: sticky; top: 0;
+  z-index: 8;
+  background: #4a3410;
+  display: flex; align-items: center; justify-content: center;
+  height: 48px;
+  border-bottom: 1px solid #9b7a42;
+  border-left: 1px solid rgba(255,255,255,0.15);
+  overflow: hidden;
+}
+
+/* Full-width group separator row */
+.gc-group {
+  grid-column: 1 / -1;
+  background: #c8a870; color: #3a1f00;
+  font-size: 11px; font-weight: bold;
+  padding: 3px 8px; height: 20px;
+  display: flex; align-items: center;
+  border-bottom: 1px solid #b89050;
+  letter-spacing: 0.5px;
+}
+
+/* Room name cell: sticky left */
+.gc-room {
+  position: sticky; left: 0;
+  z-index: 5;
+  display: flex; flex-direction: row;
+  align-items: center; gap: 4px;
+  padding: 4px 6px;
+  border-bottom: 1px solid #e0d5c0;
+  border-right: 2px solid #9b7a42;
+  height: 56px; box-sizing: border-box;
+  min-width: 0;
+}
+.gc-room.lec-even { background: #faf8f4; }
+.gc-room.lec-odd  { background: #fff; }
+.gc-room.tr-even  { background: #eef3ff; }
+.gc-room.tr-odd   { background: #f5f8ff; }
+
+.room-name-link {
+  flex: 1; min-width: 0;
+  color: #0055aa; text-decoration: none;
+  font-size: 11px; font-weight: bold; cursor: pointer;
+  display: block; overflow: hidden;
+  text-overflow: ellipsis; white-space: nowrap;
+  line-height: 1.3;
+}
+.room-name-link:hover { text-decoration: underline; }
+
+.btn-reserve {
+  flex-shrink: 0;
+  background: #2d7a2d; color: #fff;
+  border: none; border-radius: 4px;
+  padding: 5px 0; font-size: 10px;
+  cursor: pointer; width: 48px;
+  font-weight: bold; font-family: inherit;
+  text-align: center;
+}
+.btn-reserve:hover { background: #1f5a1f; }
+.btn-reserve:active { background: #144014; }
+
+/* Timeline cell: spans all period+break columns */
+.gc-timeline {
+  position: relative;
+  height: 56px;
+  border-bottom: 1px solid #e0d5c0;
+  overflow: visible;
+  box-sizing: border-box;
+  min-width: 1060px;
+}
+.gc-timeline.lec-even { background: #faf8f4; }
+.gc-timeline.lec-odd  { background: #fff; }
+.gc-timeline.tr-even  { background: #eef3ff; }
+.gc-timeline.tr-odd   { background: #f5f8ff; }
+
+/* Break area shading (PX_PER_MIN=2: break1=180-200, lunch=380-480, break3=660-680, break4=860-880) */
+.gc-timeline::before {
+  content: '';
+  position: absolute; inset: 0;
+  background:
+    linear-gradient(to right,
+      transparent 180px, rgba(40,20,0,0.10) 180px,
+      rgba(40,20,0,0.10) 200px, transparent 200px,
+      transparent 380px, rgba(40,20,0,0.10) 380px,
+      rgba(40,20,0,0.10) 480px, transparent 480px,
+      transparent 660px, rgba(40,20,0,0.10) 660px,
+      rgba(40,20,0,0.10) 680px, transparent 680px,
+      transparent 860px, rgba(40,20,0,0.10) 860px,
+      rgba(40,20,0,0.10) 880px, transparent 880px
+    );
+  pointer-events: none; z-index: 0;
+}
+
+/* ===== RESERVATION BLOCKS ===== */
+.res-block {
+  position: absolute;
+  top: 6px;
+  height: 44px;
+  border-radius: 4px;
+  border: 1px solid rgba(0,0,0,0.25);
+  cursor: pointer;
+  overflow: hidden;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  padding: 0 5px;
+  font-size: 11px;
+  font-weight: bold;
+  color: #fff;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.35);
+  transition: opacity 0.15s, box-shadow 0.15s;
+  box-sizing: border-box;
+}
+.res-block:hover { opacity: 0.88; box-shadow: 0 3px 8px rgba(0,0,0,0.3); }
+.res-block.dept-pt    { background: #2563eb; }
+.res-block.dept-ot    { background: #f97316; }
+.res-block.dept-jimu  { background: #16a34a; }
+.res-block.dept-other { background: #9ca3af; }
+
+/* ===== MINI CALENDAR ===== */
+.mini-cal-wrap { flex-shrink: 0; }
+.mini-calendar {
+  border: 1px solid #9b7a42;
+  border-radius: 6px;
+  background: #fff;
+  width: 210px;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+.mini-cal-header {
+  background: #7a5c2e; color: #fff;
+  padding: 4px 6px;
+  font-weight: bold; font-size: 13px;
+  display: flex; align-items: center; justify-content: space-between;
+}
+.mini-cal-nav {
+  background: none; border: none; color: #fff;
+  cursor: pointer; font-size: 15px; padding: 2px 6px;
+  opacity: 0.8; font-family: inherit; line-height: 1;
+  border-radius: 3px;
+}
+.mini-cal-nav:hover { opacity: 1; background: rgba(255,255,255,0.15); }
+.mini-cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); }
+.mini-cal-dow {
+  text-align: center; padding: 5px 2px;
+  font-size: 11px; font-weight: bold;
+  border-bottom: 1px solid #e0d5c0;
+  background: #f5f0e8;
+}
+.mini-cal-dow.sun { color: #cc3300; }
+.mini-cal-dow.sat { color: #0066cc; }
+.mini-cal-day {
+  text-align: center; padding: 5px 2px;
+  font-size: 12px; cursor: pointer;
+  transition: background 0.1s;
+}
+.mini-cal-day:hover { background: #f0e8d8; }
+.mini-cal-day.today { color: #cc3300; font-weight: bold; }
+.mini-cal-day.selected { background: #7a5c2e; color: #fff; border-radius: 3px; }
+.mini-cal-day.sun { color: #cc3300; }
+.mini-cal-day.sat { color: #0066cc; }
+.mini-cal-day.empty, .mini-cal-day.other-month { cursor: default; color: #ccc; }
+.mini-cal-day.selected.sun, .mini-cal-day.selected.sat { color: #fff; }
+
+/* ===== SCROLL HINT ===== */
+.scroll-hint {
+  font-size: 11px; color: #9b7a42;
+  text-align: center; padding: 3px;
+  background: #fffdf5;
+  border-top: 1px solid #e0d5c0;
+}
+
+/* ===== OCCUPANCY PANEL ===== */
+.occ-panel {
+  margin-top: 12px;
+  border: 1px solid #b8cce8;
+  border-radius: 6px;
+  overflow: hidden;
+  background: #fff;
+}
+.occ-header {
+  background: #1a4b8a; color: #fff;
+  padding: 7px 12px;
+  font-weight: bold; font-size: 13px;
+  display: flex; align-items: center; justify-content: space-between;
+  cursor: pointer;
+}
+.occ-toggle { font-size: 11px; opacity: 0.85; }
+.occ-body { padding: 12px; }
+.occ-period-label {
+  font-size: 12px; color: #1a4b8a;
+  background: #eef3ff; padding: 5px 10px;
+  border-radius: 4px; margin-bottom: 10px;
+  display: inline-block; border: 1px solid #b8cce8;
+}
+.occ-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.occ-table th {
+  background: #dde8f8; padding: 6px 10px;
+  text-align: center; border-bottom: 2px solid #9ab0d8;
+  font-size: 11px; color: #1a4b8a; white-space: nowrap;
+}
+.occ-table th:first-child { text-align: left; }
+.occ-table td {
+  padding: 5px 8px; border-bottom: 1px solid #eee;
+  text-align: center; font-size: 12px;
+}
+.occ-table tr:last-child td { border-bottom: none; }
+.occ-table td:first-child { text-align: left; font-weight: bold; }
+.occ-table tr.group-lec td { background: #faf8f4; }
+.occ-table tr.group-tr  td { background: #f5f8ff; }
+.occ-table tr.total-row td { background: #f0f4fc; font-weight: bold; border-top: 2px solid #9ab0d8; }
+.occ-bar-wrap {
+  background: #e0e8f0; border-radius: 4px;
+  height: 10px; width: 80px;
+  display: inline-block; vertical-align: middle;
+  overflow: hidden;
+}
+.occ-bar-fill {
+  border-radius: 4px; height: 10px;
+  transition: width 0.5s ease;
+}
+.occ-bar-fill.high   { background: #16a34a; }
+.occ-bar-fill.medium { background: #f97316; }
+.occ-bar-fill.low    { background: #9ca3af; }
+.occ-legend {
+  font-size: 11px; color: #666;
+  margin-top: 8px; display: flex; gap: 12px; flex-wrap: wrap;
+}
+.occ-legend-item { display: flex; align-items: center; gap: 4px; }
+.occ-legend-dot {
+  width: 10px; height: 10px; border-radius: 2px; flex-shrink: 0;
+}
+
+/* ===== LOG PANEL ===== */
+.log-panel {
+  margin-top: 12px;
+  border: 1px solid #c8b88a;
+  border-radius: 6px;
+  overflow: hidden;
+  background: #fff;
+}
+.log-header {
+  background: #5c3d1a; color: #fff;
+  padding: 7px 12px;
+  font-weight: bold; font-size: 13px;
+  display: flex; align-items: center; justify-content: space-between;
+  cursor: pointer;
+}
+.log-toggle { font-size: 11px; opacity: 0.8; }
+.log-body { max-height: 200px; overflow-y: auto; }
+.log-body table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.log-body th {
+  background: #f5f0e8; padding: 5px 8px;
+  text-align: left; border-bottom: 1px solid #d4c8a8;
+  position: sticky; top: 0; font-size: 11px;
+}
+.log-body td { padding: 5px 8px; border-bottom: 1px solid #eee; }
+.log-body tr:last-child td { border-bottom: none; }
+.log-empty { padding: 12px; text-align: center; color: #999; font-size: 12px; }
+
+/* ===== MODAL ===== */
+.modal-overlay {
+  display: none;
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.55);
+  z-index: 1000;
+  align-items: center; justify-content: center;
+  padding: 12px;
+}
+.modal-overlay.open { display: flex; }
+.modal-box {
+  background: #fff; border-radius: 8px;
+  width: 100%; max-width: 480px;
+  max-height: 85vh; overflow-y: auto;
+  box-shadow: 0 12px 40px rgba(0,0,0,0.3);
+  overscroll-behavior: contain;
+}
+.modal-header {
+  background: #7a5c2e; color: #fff;
+  padding: 12px 16px; border-radius: 8px 8px 0 0;
+  display: flex; align-items: center; justify-content: space-between;
+  position: sticky; top: 0;
+}
+.modal-header h2 { font-size: 15px; }
+.modal-close {
+  background: none; border: none; color: #fff;
+  font-size: 22px; cursor: pointer; padding: 0 4px; line-height: 1;
+}
+.modal-body { padding: 16px; }
+.form-row { margin-bottom: 12px; }
+.form-row label {
+  display: block; font-size: 12px; font-weight: bold;
+  margin-bottom: 4px; color: #5c3d1a;
+}
+.form-row label .req { color: #cc0000; }
+.form-row input,
+.form-row select,
+.form-row textarea {
+  width: 100%; border: 1px solid #ccc; border-radius: 4px;
+  padding: 7px 9px; font-size: 16px; font-family: inherit;
+  -webkit-appearance: none;
+}
+.form-row input:focus,
+.form-row select:focus,
+.form-row textarea:focus {
+  outline: none; border-color: #9b7a42;
+  box-shadow: 0 0 0 2px rgba(155,122,66,0.2);
+}
+.form-row textarea { resize: vertical; min-height: 64px; }
+.form-inline { display: flex; gap: 10px; }
+.form-inline > div { flex: 1; }
+.form-error {
+  background: #fff0f0; border: 1px solid #ffaaaa;
+  border-radius: 4px; padding: 9px 12px;
+  color: #cc0000; font-size: 12px; margin-bottom: 12px; display: none;
+}
+.form-error.visible { display: block; }
+.form-success {
+  background: #f0fff0; border: 1px solid #aaffaa;
+  border-radius: 4px; padding: 9px 12px;
+  color: #006600; font-size: 12px; margin-bottom: 12px; display: none;
+}
+.form-success.visible { display: block; }
+.modal-footer {
+  padding: 12px 16px; border-top: 1px solid #eee;
+  display: flex; gap: 8px; justify-content: flex-end;
+  position: sticky; bottom: 0; background: #fff;
+}
+.btn-primary {
+  background: #7a5c2e; color: #fff; border: none;
+  border-radius: 5px; padding: 9px 22px;
+  font-size: 13px; cursor: pointer; font-family: inherit;
+}
+.btn-primary:hover { background: #5c3d1a; }
+.btn-danger {
+  background: #cc2200; color: #fff; border: none;
+  border-radius: 5px; padding: 9px 22px;
+  font-size: 13px; cursor: pointer; font-family: inherit;
+}
+.btn-danger:hover { background: #991100; }
+.btn-secondary {
+  background: #fff; color: #5c3d1a;
+  border: 1px solid #9b7a42; border-radius: 5px;
+  padding: 9px 22px; font-size: 13px;
+  cursor: pointer; font-family: inherit;
+}
+.btn-secondary:hover { background: #f0e8d8; }
+
+/* ===== DETAIL TABLE ===== */
+.detail-table { width: 100%; border-collapse: collapse; }
+.detail-table th, .detail-table td {
+  padding: 7px 10px; border: 1px solid #e0d5c0; font-size: 13px;
+}
+.detail-table th { background: #f5f0e8; font-weight: bold; width: 110px; color: #5c3d1a; }
+
+/* ===== TOOLTIP ===== */
+.tooltip {
+  display: none; position: fixed;
+  background: rgba(30,30,30,0.95); color: #fff;
+  border-radius: 5px; padding: 9px 13px;
+  font-size: 12px; z-index: 2000; max-width: 260px;
+  pointer-events: none; line-height: 1.7;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+}
+.tooltip.visible { display: block; }
+
+/* ===== LOGIN OVERLAY ===== */
+#loginOverlay {
+  position: fixed; inset: 0;
+  background: linear-gradient(135deg, #5c3d1a 0%, #2a1a08 100%);
+  z-index: 9999;
+  display: none;
+  align-items: center; justify-content: center;
+}
+#loginOverlay.open { display: flex; }
+.login-box {
+  background: #fff; border-radius: 12px;
+  padding: 32px 28px; width: 320px;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+}
+.login-logo { font-size: 36px; text-align: center; margin-bottom: 6px; }
+.login-box h2 {
+  color: #5c3d1a; font-size: 17px; margin-bottom: 22px;
+  text-align: center; font-weight: bold;
+}
+.login-field { margin-bottom: 14px; }
+.login-field label {
+  display: block; font-size: 12px; font-weight: bold;
+  color: #5c3d1a; margin-bottom: 5px;
+}
+.login-field input {
+  width: 100%; padding: 9px 10px; font-size: 16px;
+  border: 1px solid #ccc; border-radius: 5px;
+  font-family: inherit; -webkit-appearance: none; box-sizing: border-box;
+}
+.login-field input:focus {
+  outline: none; border-color: #9b7a42;
+  box-shadow: 0 0 0 2px rgba(155,122,66,0.25);
+}
+.btn-login {
+  width: 100%; background: #7a5c2e; color: #fff;
+  border: none; border-radius: 6px; padding: 11px;
+  font-size: 15px; font-weight: bold; cursor: pointer;
+  font-family: inherit; margin-top: 4px;
+}
+.btn-login:hover { background: #5c3d1a; }
+.login-error {
+  color: #cc0000; font-size: 12px; margin-top: 10px;
+  text-align: center; min-height: 18px;
+}
+.btn-logout {
+  background: rgba(255,255,255,0.18);
+  border: 1px solid rgba(255,255,255,0.4);
+  color: #fff; border-radius: 4px;
+  padding: 4px 10px; font-size: 12px;
+  cursor: pointer; font-family: inherit;
+  display: none;
+}
+.btn-logout:hover { background: rgba(255,255,255,0.3); }
+
+/* ===== LOADING ===== */
+.loading-overlay {
+  display: none; position: fixed; inset: 0;
+  background: rgba(255,255,255,0.75);
+  z-index: 900; align-items: center; justify-content: center;
+  flex-direction: column; gap: 12px;
+}
+.loading-overlay.visible { display: flex; }
+.spinner {
+  width: 40px; height: 40px;
+  border: 4px solid #e0d5c0; border-top-color: #7a5c2e;
+  border-radius: 50%; animation: spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ===== MOBILE ===== */
+@media (max-width: 680px) {
+  .main-wrap { padding: 8px; }
+  .top-row { flex-direction: column; }
+  .mini-cal-wrap { width: 100%; }
+  .mini-calendar { width: 100%; }
+  .gc-corner { min-width: 120px; font-size: 11px; }
+  .gc-room { padding: 3px 4px; min-width: 120px; }
+  .room-name-link { font-size: 10px; }
+  .btn-reserve { width: 40px; font-size: 9px; }
+  .gantt-container { max-height: calc(100vh - 300px); }
+  .status-date { font-size: 14px; }
+  .log-panel, .occ-panel { margin-top: 8px; }
+  .action-bar { padding: 5px 8px; }
+}
+@media (min-width: 681px) {
+  .scroll-hint { display: none; }
+}
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<div class="page-header">
+  <h1>🏢 教室予約システム</h1>
+  <div style="display:flex;align-items:center;gap:10px;">
+    <span id="headerUser" style="font-size:12px; opacity:0.85;"></span>
+    <button class="btn-logout" id="logoutBtn" onclick="doLogout()">ログアウト</button>
+  </div>
+</div>
+
+<!-- MAIN WRAP -->
+<div class="main-wrap">
+
+  <!-- TOP ROW: Status bar (left) + Mini Calendar (right) -->
+  <div class="top-row">
+    <div class="status-bar">
+      <div class="status-date" id="statusDate"></div>
+      <div class="nav-btns">
+        <button class="nav-btn" onclick="changeDate(-1)">＜ 前日</button>
+        <button class="nav-btn" onclick="goToday()">当日</button>
+        <button class="nav-btn" onclick="changeDate(1)">翌日 ＞</button>
+      </div>
+    </div>
+    <div class="mini-cal-wrap">
+      <div class="mini-calendar">
+        <div class="mini-cal-header" id="miniCalHeader"></div>
+        <div class="mini-cal-grid" id="miniCalGrid"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ACTION BAR: Download & Occupancy buttons -->
+  <div class="action-bar">
+    <span class="action-bar-label">📋 週間管理：</span>
+    <button class="btn-download" onclick="downloadWeeklyCSV()">📥 週間スケジュールをCSVでダウンロード</button>
+    <button class="btn-occ" onclick="toggleOccupancy()">📊 教室稼働率を表示</button>
+  </div>
+
+  <!-- LEGEND -->
+  <div class="legend-bar">
+    <span style="font-size:12px;font-weight:bold;">凡例（予約）：</span>
+    <div class="legend-item"><div class="legend-box leg-pt"></div>PT</div>
+    <div class="legend-item"><div class="legend-box leg-ot"></div>OT</div>
+    <div class="legend-item"><div class="legend-box leg-jimu"></div>事務</div>
+    <div class="legend-item"><div class="legend-box leg-other"></div>その他</div>
+    <span class="legend-note">※教室名をクリックするとご利用情報をご覧いただけます。</span>
+  </div>
+
+  <!-- GANTT -->
+  <div class="left-section">
+    <div class="gantt-container" id="ganttContainer">
+      <div class="gantt-grid" id="ganttGrid"></div>
+    </div>
+
+    <div class="scroll-hint">← 左右・上下にスクロールできます →</div>
+
+    <!-- Occupancy Panel -->
+    <div class="occ-panel" id="occPanel" style="display:none;">
+      <div class="occ-header" onclick="toggleOccupancy()">
+        📊 教室稼働率（週間集計）
+        <span class="occ-toggle" id="occToggleText">▼ 閉じる</span>
+      </div>
+      <div class="occ-body" id="occBody">
+        <div id="occPeriodLabel" class="occ-period-label"></div>
+        <table class="occ-table">
+          <thead>
+            <tr>
+              <th style="text-align:left;">教室名</th>
+              <th>予約件数</th>
+              <th>合計時間(h)</th>
+              <th>稼働率</th>
+            </tr>
+          </thead>
+          <tbody id="occTbody"></tbody>
+        </table>
+        <div class="occ-legend">
+          <div class="occ-legend-item">
+            <div class="occ-legend-dot" style="background:#16a34a;"></div>
+            <span>高稼働（70%以上）</span>
+          </div>
+          <div class="occ-legend-item">
+            <div class="occ-legend-dot" style="background:#f97316;"></div>
+            <span>中稼働（30〜70%）</span>
+          </div>
+          <div class="occ-legend-item">
+            <div class="occ-legend-dot" style="background:#9ca3af;"></div>
+            <span>低稼働（30%未満）</span>
+          </div>
+          <span style="margin-left:8px;font-size:11px;color:#888;">※稼働率 = 予約時間 ÷ (営業日数 × 7.5時間〔1〜5限〕) × 100%</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Operation Log -->
+    <div class="log-panel">
+      <div class="log-header" onclick="toggleLog()">
+        📋 操作ログ（最新20件）
+        <span class="log-toggle" id="logToggleText">▼ 表示</span>
+      </div>
+      <div class="log-body" id="logBody" style="display:none;">
+        <div class="log-empty" id="logEmpty">ログはありません</div>
+        <table id="logTable" style="display:none;">
+          <thead>
+            <tr>
+              <th>日時</th><th>操作</th><th>施設</th><th>予約者</th><th>時間帯</th>
+            </tr>
+          </thead>
+          <tbody id="logTbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /main-wrap -->
+
+<!-- ===== MODALS ===== -->
+
+<!-- Reserve Modal -->
+<div class="modal-overlay" id="reserveModal">
+  <div class="modal-box">
+    <div class="modal-header">
+      <h2>🗓️ 教室予約申請</h2>
+      <button class="modal-close" onclick="closeModal('reserveModal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-error" id="reserveError"></div>
+      <div class="form-success" id="reserveSuccess"></div>
+      <div class="form-row">
+        <label>施設名 <span class="req">*</span></label>
+        <select id="f_room"></select>
+      </div>
+      <div class="form-row">
+        <label>利用日 <span class="req">*</span></label>
+        <input type="date" id="f_date">
+      </div>
+      <div class="form-row form-inline">
+        <div>
+          <label>開始時刻 <span class="req">*</span></label>
+          <select id="f_start"></select>
+        </div>
+        <div>
+          <label>終了時刻 <span class="req">*</span></label>
+          <select id="f_end"></select>
+        </div>
+      </div>
+      <div class="form-row">
+        <label>予約者氏名 <span class="req">*</span></label>
+        <input type="text" id="f_name" placeholder="例：山田 太郎">
+      </div>
+      <div class="form-row">
+        <label>所属 <span class="req">*</span></label>
+        <select id="f_dept">
+          <option value="">選択してください</option>
+          <option value="PT">PT</option>
+          <option value="OT">OT</option>
+          <option value="事務">事務</option>
+          <option value="その他">その他</option>
+        </select>
+      </div>
+      <div class="form-row">
+        <label>授業区分 <span class="req">*</span></label>
+        <select id="f_class">
+          <option value="">選択してください</option>
+          <option value="講義">講義</option>
+          <option value="実習">実習</option>
+          <option value="演習">演習</option>
+          <option value="勉強会・自主練習">勉強会・自主練習</option>
+          <option value="試験">試験</option>
+          <option value="会議・研修">会議・研修</option>
+          <option value="個人利用">個人利用</option>
+          <option value="その他">その他</option>
+        </select>
+      </div>
+      <div class="form-row">
+        <label>備考</label>
+        <textarea id="f_purpose" placeholder="例：使用機材、特記事項など"></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secondary" onclick="closeModal('reserveModal')">キャンセル</button>
+      <button class="btn-primary" onclick="submitReservation()">予約</button>
+    </div>
+  </div>
+</div>
+
+<!-- Detail Modal -->
+<div class="modal-overlay" id="detailModal">
+  <div class="modal-box">
+    <div class="modal-header">
+      <h2 id="detailTitle">予約詳細</h2>
+      <button class="modal-close" onclick="closeModal('detailModal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <table class="detail-table" id="detailTable"></table>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secondary" onclick="closeModal('detailModal')">閉じる</button>
+      <button class="btn-danger" id="detailCancelBtn" onclick="cancelReservation()" style="display:none;">この予約をキャンセル</button>
+    </div>
+  </div>
+</div>
+
+<!-- Room Info Modal -->
+<div class="modal-overlay" id="roomModal">
+  <div class="modal-box">
+    <div class="modal-header">
+      <h2 id="roomModalTitle">施設情報</h2>
+      <button class="modal-close" onclick="closeModal('roomModal')">✕</button>
+    </div>
+    <div class="modal-body" id="roomModalBody"></div>
+    <div class="modal-footer">
+      <button class="btn-secondary" onclick="closeModal('roomModal')">閉じる</button>
+    </div>
+  </div>
+</div>
+
+<!-- Login Overlay -->
+<div id="loginOverlay">
+  <div class="login-box">
+    <div class="login-logo">🏢</div>
+    <h2>教室予約システム</h2>
+    <div class="login-field">
+      <label>ユーザーID</label>
+      <input type="text" id="loginId" placeholder="IDを入力" autocomplete="username">
+    </div>
+    <div class="login-field">
+      <label>パスワード</label>
+      <input type="password" id="loginPw" placeholder="パスワードを入力" autocomplete="current-password">
+    </div>
+    <button class="btn-login" onclick="doLogin()">ログイン</button>
+    <div class="login-error" id="loginError"></div>
+  </div>
+</div>
+
+<!-- Tooltip -->
+<div class="tooltip" id="tooltip"></div>
+
+<!-- Loading -->
+<div class="loading-overlay" id="loadingOverlay">
+  <div class="spinner"></div>
+  <div>読み込み中...</div>
+</div>
+
+<script>
+/* ================================================================
+   ★ CONFIG  —  本番運用セットアップ手順（Microsoft 365 / SharePoint）
+   ================================================================
+   【手順1】SharePoint サイトにカスタムリスト「Reservations」を作成
+     列名（内部名）:
+       Title            (テキスト)   — 予約ID（自動生成）
+       RoomID           (テキスト)   — 教室ID（例: Lec1）
+       ReservationDate  (日付)       — 利用日
+       StartTime        (テキスト)   — 開始時刻（例: 09:00）
+       EndTime          (テキスト)   — 終了時刻
+       ReserverName     (テキスト)   — 予約者氏名
+       Department       (テキスト)   — 所属（PT/OT/事務/その他）
+       ClassType        (テキスト)   — 授業区分
+       ReserverEmail    (テキスト)   — メールアドレス
+       Purpose          (複数行)     — 備考
+       Status           (テキスト)   — 確定予約 / 仮予約 / キャンセル済み
+
+   【手順2】下の sharepointSiteUrl にSharePointサイトのURLを入力
+     例: 'https://nagoya-cu.sharepoint.com/sites/classroom'
+
+   【手順3】このHTMLファイルをGitHub Pagesに公開
+     個人GitHubリポジトリ → Settings → Pages → Source: main / root
+     社内の人が https://ユーザー名.github.io/リポジトリ名/ にアクセス
+     SharePointの会社アカウントで自動認証されます
+
+   ※ sharepointSiteUrl が空の場合はデモモードで動作します
+   ================================================================ */
+const CONFIG = {
+  sharepointSiteUrl: '',
+  scriptUrl: 'https://script.google.com/macros/s/AKfycbwWjgjp8z0Axirz9yZ245fVqIKI8tLAYh-5wR5UOxm6t-Bq36tTXf-XjNCItHvkG8NQfw/exec', // ★ Apps Script Web App の URL をここに貼り付ける
+  maxAdvanceDays: 90,
+  operatingHours: { start: 9, end: 18 }, // kept for compatibility
+  hourWidth: 100,
+  rooms: [
+    // 講義室 1〜6
+    { id: 'Lec1', name: '講義室①',    group: 'lec', capacity: 40 },
+    { id: 'Lec2', name: '講義室②',    group: 'lec', capacity: 40 },
+    { id: 'Lec3', name: '講義室③',    group: 'lec', capacity: 40 },
+    { id: 'Lec4', name: '講義室④',    group: 'lec', capacity: 40 },
+    { id: 'Lec5', name: '講義室⑤',    group: 'lec', capacity: 40 },
+    { id: 'Lec6', name: '講義室⑥',    group: 'lec', capacity: 40 },
+    // 治療演習室 1〜8
+    { id: 'Tr1',  name: '治療演習室①', group: 'tr',  capacity: 20 },
+    { id: 'Tr2',  name: '治療演習室②', group: 'tr',  capacity: 20 },
+    { id: 'Tr3',  name: '治療演習室③', group: 'tr',  capacity: 20 },
+    { id: 'Tr4',  name: '治療演習室④', group: 'tr',  capacity: 20 },
+    { id: 'Tr5',  name: '治療演習室⑤', group: 'tr',  capacity: 20 },
+    { id: 'Tr6',  name: '治療演習室⑥', group: 'tr',  capacity: 20 },
+    { id: 'Tr7',  name: '治療演習室⑦', group: 'tr',  capacity: 20 },
+    { id: 'Tr8',  name: '治療演習室⑧', group: 'tr',  capacity: 20 },
+  ]
+};
+
+/* ================================================================
+   PERIOD / TIMETABLE DEFINITIONS
+   ================================================================ */
+const PERIODS = [
+  { n: 1, label: '1限', start: '09:00', end: '10:30', startMin: 540,  endMin: 630  },
+  { n: 2, label: '2限', start: '10:40', end: '12:10', startMin: 640,  endMin: 730  },
+  { n: 3, label: '3限', start: '13:00', end: '14:30', startMin: 780,  endMin: 870  },
+  { n: 4, label: '4限', start: '14:40', end: '16:10', startMin: 880,  endMin: 970  },
+  { n: 5, label: '5限', start: '16:20', end: '17:50', startMin: 980,  endMin: 1070 },
+];
+// Segments: alternating period/break columns for the Gantt grid header
+const SEGMENTS = [
+  { type: 'period', period: 1, startMin: 540,  endMin: 630  },
+  { type: 'break',  label: '休憩',  startMin: 630,  endMin: 640  },
+  { type: 'period', period: 2, startMin: 640,  endMin: 730  },
+  { type: 'break',  label: '昼休み', startMin: 730,  endMin: 780  },
+  { type: 'period', period: 3, startMin: 780,  endMin: 870  },
+  { type: 'break',  label: '休憩',  startMin: 870,  endMin: 880  },
+  { type: 'period', period: 4, startMin: 880,  endMin: 970  },
+  { type: 'break',  label: '休憩',  startMin: 970,  endMin: 980  },
+  { type: 'period', period: 5, startMin: 980,  endMin: 1070 },
+];
+const SCHOOL_START_MIN   = 540;   // 09:00
+const SCHOOL_END_MIN     = 1070;  // 17:50
+const PX_PER_MIN         = 2;     // 2px per minute → total width 1060px
+const TOTAL_PERIOD_MINUTES = 5 * 90; // 450 min = 7.5h (5 periods × 90 min)
+
+// All valid time values (period boundaries) shown in time selects
+const PERIOD_TIMES = [
+  { value: '09:00', label: '1限 開始 (09:00)' },
+  { value: '10:30', label: '1限 終了 (10:30)' },
+  { value: '10:40', label: '2限 開始 (10:40)' },
+  { value: '12:10', label: '2限 終了 (12:10)' },
+  { value: '13:00', label: '3限 開始 (13:00)' },
+  { value: '14:30', label: '3限 終了 (14:30)' },
+  { value: '14:40', label: '4限 開始 (14:40)' },
+  { value: '16:10', label: '4限 終了 (16:10)' },
+  { value: '16:20', label: '5限 開始 (16:20)' },
+  { value: '17:50', label: '5限 終了 (17:50)' },
+];
+
+/* ================================================================
+   STATE
+   ================================================================ */
+const state = {
+  currentDate: new Date(),
+  calendarViewDate: new Date(), // month shown in mini calendar (navigated independently)
+  reservations: [],
+  currentUser: { email: '', name: '' },
+  selectedReservation: null,
+  logs: JSON.parse(localStorage.getItem('roomCalendarLogs') || '[]'),
+  weeklyData: null,      // { dateStr: [reservations] }
+  weeklyOccKey: null,    // dateStr of Monday of loaded week
+};
+
+/* ================================================================
+   DATE UTILS
+   ================================================================ */
+const jpDays   = ['日','月','火','水','木','金','土'];
+const jpMonths = ['1月','2月','3月','4月','5月','6月','7月','8月','9月','10月','11月','12月'];
+
+const dateToStr = d =>
+  `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+const strToDate = s => { const [y,m,d]=s.split('-').map(Number); return new Date(y,m-1,d); };
+const toMin     = t => { const [h,m]=t.split(':').map(Number); return h*60+m; };
+const toTime    = m => `${String(Math.floor(m/60)).padStart(2,'0')}:${String(m%60).padStart(2,'0')}`;
+const fmtJP     = d => `${d.getFullYear()}年${d.getMonth()+1}月${d.getDate()}日（${jpDays[d.getDay()]}）`;
+
+function getWeekDates(d) {
+  const date = new Date(d);
+  const dow = date.getDay(); // 0=Sun
+  const diff = dow === 0 ? -6 : 1 - dow; // shift to Monday
+  const mon = new Date(date);
+  mon.setDate(date.getDate() + diff);
+  const dates = [];
+  for (let i = 0; i < 7; i++) {
+    const nd = new Date(mon);
+    nd.setDate(mon.getDate() + i);
+    dates.push(nd);
+  }
+  return dates;
+}
+
+/* ================================================================
+   DEMO DATA — generates realistic data for any weekday
+   ================================================================ */
+// Blank system: no built-in demo reservations
+const DEMO_PATTERNS = {};
+
+function getDemoDataForDate(dateStr) {
+  const d = strToDate(dateStr);
+  const dow = d.getDay();
+  const patterns = (dow === 0 || dow === 6) ? [] : (DEMO_PATTERNS[dow] || []);
+  const me = state.currentUser.email || 'demo@example.com';
+  const myName = state.currentUser.name || 'デモユーザー';
+  const demoData = patterns.map((p, i) => ({
+    id: `R${dateStr.replace(/-/g,'')}-${String(i+1).padStart(3,'0')}`,
+    roomId: p.roomId,
+    date: dateStr,
+    start: p.start,
+    end: p.end,
+    name: i === 0 ? myName : p.name,
+    dept: p.dept,
+    classType: p.classType || '',
+    email: i === 0 ? me : p.name.replace(/\s/g,'.') + '@example.com',
+    purpose: p.purpose,
+    status: p.status,
+  }));
+  // Merge user-added reservations persisted in localStorage
+  const saved = JSON.parse(localStorage.getItem('demoReservations') || '{}');
+  const userAdded = (saved[dateStr] || []).filter(r => r.status !== 'キャンセル済み');
+  return [...demoData, ...userAdded];
+}
+
+/* ================================================================
+   SHAREPOINT API
+   ================================================================ */
+/* ================================================================
+   GOOGLE APPS SCRIPT API 連携
+   ================================================================ */
+async function callAPI(action, payload = {}) {
+  const token = sessionStorage.getItem('authToken') || '';
+  const res = await fetch(CONFIG.scriptUrl, {
+    method: 'POST',
+    body: JSON.stringify({ action, token, ...payload }),
+    redirect: 'follow',
+  });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
+}
+
+/* ================================================================
+   ログイン / ログアウト
+   ================================================================ */
+async function doLogin() {
+  const userId   = document.getElementById('loginId').value.trim();
+  const password = document.getElementById('loginPw').value;
+  const errEl    = document.getElementById('loginError');
+  errEl.textContent = '';
+
+  if (!userId || !password) {
+    errEl.textContent = 'IDとパスワードを入力してください。';
+    return;
+  }
+  showLoading(true);
+  try {
+    const result = await callAPI('login', { userId, password });
+    if (result.success) {
+      sessionStorage.setItem('authToken', result.token);
+      sessionStorage.setItem('currentUser', JSON.stringify(result.user));
+      state.currentUser = result.user;
+      document.getElementById('loginOverlay').classList.remove('open');
+      document.getElementById('headerUser').textContent =
+        `👤 ${result.user.name}（${result.user.dept}）`;
+      document.getElementById('logoutBtn').style.display = 'inline-block';
+      await refresh();
+      setupModalListeners();
+    } else {
+      errEl.textContent = result.error || 'ログインに失敗しました。';
+    }
+  } catch(e) {
+    errEl.textContent = 'サーバーに接続できません。URLの設定を確認してください。';
+    console.error(e);
+  } finally { showLoading(false); }
+}
+
+function doLogout() {
+  if (!confirm('ログアウトしますか？')) return;
+  sessionStorage.removeItem('authToken');
+  sessionStorage.removeItem('currentUser');
+  location.reload();
+}
+
+/* ================================================================
+   SHAREPOINT API → GAS API に置き換え
+   ================================================================ */
+async function loadReservationsForDate(dateStr) {
+  if (!CONFIG.scriptUrl) return getDemoDataForDate(dateStr);
+  try {
+    const result = await callAPI('getReservations', { date: dateStr });
+    return result.success ? result.reservations : [];
+  } catch(e) { console.error(e); return []; }
+}
+
+async function loadReservations(dateStr) {
+  if (!CONFIG.scriptUrl) {
+    state.reservations = getDemoDataForDate(dateStr);
+    return;
+  }
+  try {
+    showLoading(true);
+    const result = await callAPI('getReservations', { date: dateStr });
+    if (result.success) {
+      state.reservations = result.reservations;
+    } else {
+      if (result.error && result.error.includes('認証')) {
+        sessionStorage.clear(); location.reload(); return;
+      }
+      state.reservations = [];
+    }
+  } catch(e) { console.error(e); state.reservations = []; }
+  finally { showLoading(false); }
+}
+
+async function saveReservation(data) {
+  addLog('予約申請', data.roomId, data.name, `${data.start}〜${data.end}`);
+
+  if (!CONFIG.scriptUrl) {
+    // デモモード（localStorage）
+    data.id = `R${dateToStr(new Date()).replace(/-/g,'')}-${String(Date.now()).slice(-4)}`;
+    data.status = '確定予約';
+    data.createdById = state.currentUser?.id || 'demo';
+    const saved = JSON.parse(localStorage.getItem('demoReservations') || '{}');
+    if (!saved[data.date]) saved[data.date] = [];
+    saved[data.date].push({...data});
+    localStorage.setItem('demoReservations', JSON.stringify(saved));
+    state.reservations.push({...data});
+    return { success: true };
+  }
+
+  try {
+    const result = await callAPI('addReservation', { reservation: data });
+    return result;
+  } catch(e) { return { success: false, error: e.message }; }
+}
+
+/* ================================================================
+   WEEKLY CSV DOWNLOAD
+   ================================================================ */
+async function downloadWeeklyCSV() {
+  showLoading(true);
+  try {
+    const weekDates = getWeekDates(state.currentDate);
+    const allData = {};
+    for (const d of weekDates) {
+      const ds = dateToStr(d);
+      allData[ds] = await loadReservationsForDate(ds);
+    }
+
+    const BOM = '\uFEFF';
+    const rows = [];
+    const startLabel = weekDates[0].toLocaleDateString('ja-JP', {year:'numeric',month:'long',day:'numeric',weekday:'short'});
+    const endLabel   = weekDates[6].toLocaleDateString('ja-JP', {year:'numeric',month:'long',day:'numeric',weekday:'short'});
+
+    rows.push(['週間教室予約表']);
+    rows.push([`対象期間: ${startLabel} 〜 ${endLabel}`]);
+    rows.push([`出力日時: ${new Date().toLocaleString('ja-JP')}`]);
+    rows.push([]);
+    rows.push(['日付', '曜日', '教室名', '開始時刻', '終了時刻', '予約者名', '所属', '授業区分', '備考', 'ステータス']);
+
+    for (const d of weekDates) {
+      const ds = dateToStr(d);
+      const dayName = jpDays[d.getDay()];
+      const dateDisplay = `${d.getFullYear()}/${String(d.getMonth()+1).padStart(2,'0')}/${String(d.getDate()).padStart(2,'0')}`;
+      const rsvs = (allData[ds] || []).filter(r => r.status !== 'キャンセル済み');
+
+      if (rsvs.length === 0) {
+        rows.push([dateDisplay, dayName, d.getDay()===0||d.getDay()===6 ? '（休日）' : '（予約なし）', '', '', '', '', '', '']);
+      } else {
+        // Sort by room then start time
+        rsvs.sort((a, b) => {
+          const roomA = CONFIG.rooms.findIndex(r => r.id === a.roomId);
+          const roomB = CONFIG.rooms.findIndex(r => r.id === b.roomId);
+          if (roomA !== roomB) return roomA - roomB;
+          return toMin(a.start) - toMin(b.start);
+        });
+        for (const r of rsvs) {
+          const room = CONFIG.rooms.find(rm => rm.id === r.roomId);
+          rows.push([dateDisplay, dayName, room ? room.name : r.roomId, r.start, r.end, r.name, r.dept, r.classType||'', r.purpose||'', r.status]);
+        }
+      }
+    }
+
+    // Occupancy summary
+    rows.push([]);
+    rows.push(['【教室別稼働率集計】']);
+    const workdays = weekDates.filter(d => d.getDay() > 0 && d.getDay() < 6).length;
+    const opHours = (TOTAL_PERIOD_MINUTES / 60).toFixed(1);
+    rows.push([`集計基準: 営業日${workdays}日 × ${opHours}時間(1〜5限) = ${(workdays * TOTAL_PERIOD_MINUTES / 60).toFixed(1)}時間/教室`]);
+    rows.push([]);
+    rows.push(['グループ', '教室名', '予約件数', '合計予約時間(h)', `稼働率% (÷${(workdays * TOTAL_PERIOD_MINUTES / 60).toFixed(1)}h)`]);
+
+    let grandMin = 0, grandCount = 0;
+    let currentGroup = '';
+    for (const room of CONFIG.rooms) {
+      const groupLabel = room.group === 'lec' ? '講義室' : '治療演習室';
+      let totalMin = 0, count = 0;
+      for (const d of weekDates) {
+        const ds = dateToStr(d);
+        for (const r of (allData[ds]||[])) {
+          if (r.roomId === room.id && r.status !== 'キャンセル済み') {
+            totalMin += toMin(r.end) - toMin(r.start);
+            count++;
+          }
+        }
+      }
+      grandMin += totalMin;
+      grandCount += count;
+      const availMin = workdays * TOTAL_PERIOD_MINUTES;
+      const occ = availMin > 0 ? (totalMin / availMin * 100).toFixed(1) : '0.0';
+      rows.push([groupLabel, room.name, count, (totalMin/60).toFixed(1), occ + '%']);
+    }
+
+    rows.push([]);
+    const availMin = workdays * TOTAL_PERIOD_MINUTES * CONFIG.rooms.length;
+    const totalOcc = availMin > 0 ? (grandMin / availMin * 100).toFixed(1) : '0.0';
+    rows.push(['合計', `全${CONFIG.rooms.length}教室`, grandCount, (grandMin/60).toFixed(1), totalOcc + '%']);
+
+    const csvStr = rows.map(row =>
+      row.map(cell => `"${String(cell == null ? '' : cell).replace(/"/g, '""')}"`).join(',')
+    ).join('\r\n');
+
+    const blob = new Blob([BOM + csvStr], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    const weekStart = dateToStr(weekDates[0]);
+    const weekEnd   = dateToStr(weekDates[6]);
+    a.href = url;
+    a.download = `週間教室予約表_${weekStart}_${weekEnd}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+
+    addLog('CSVダウンロード', '（全教室）', state.currentUser.name || 'デモユーザー', `${weekStart}〜${weekEnd}`);
+  } catch(e) {
+    console.error(e);
+    alert('ダウンロードに失敗しました: ' + e.message);
+  } finally {
+    showLoading(false);
+  }
+}
+
+/* ================================================================
+   OCCUPANCY PANEL
+   ================================================================ */
+let occOpen = false;
+
+async function toggleOccupancy() {
+  occOpen = !occOpen;
+  const panel = document.getElementById('occPanel');
+  const toggleText = document.getElementById('occToggleText');
+
+  if (occOpen) {
+    panel.style.display = 'block';
+    toggleText.textContent = '▲ 閉じる';
+    await loadWeeklyOccData();
+    renderOccupancyTable();
+  } else {
+    panel.style.display = 'none';
+    toggleText.textContent = '▼ 開く';
+  }
+}
+
+async function loadWeeklyOccData() {
+  const weekDates = getWeekDates(state.currentDate);
+  const weekKey = dateToStr(weekDates[0]);
+  if (state.weeklyOccKey === weekKey && state.weeklyData) return;
+
+  showLoading(true);
+  const allData = {};
+  for (const d of weekDates) {
+    const ds = dateToStr(d);
+    allData[ds] = await loadReservationsForDate(ds);
+  }
+  state.weeklyData = allData;
+  state.weeklyOccKey = weekKey;
+  showLoading(false);
+}
+
+function renderOccupancyTable() {
+  const weekDates = getWeekDates(state.currentDate);
+  const workdays = weekDates.filter(d => d.getDay() > 0 && d.getDay() < 6).length;
+  const availMinPerRoom = workdays * TOTAL_PERIOD_MINUTES;
+
+  const startLabel = weekDates[0].toLocaleDateString('ja-JP', {month:'long', day:'numeric', weekday:'short'});
+  const endLabel   = weekDates[6].toLocaleDateString('ja-JP', {month:'long', day:'numeric', weekday:'short'});
+  document.getElementById('occPeriodLabel').textContent =
+    `集計期間: ${weekDates[0].getFullYear()}年 ${startLabel} 〜 ${endLabel}（営業日 ${workdays}日 × ${(TOTAL_PERIOD_MINUTES/60).toFixed(1)}時間）`;
+
+  const tbody = document.getElementById('occTbody');
+  tbody.innerHTML = '';
+
+  let grandMin = 0, grandCount = 0;
+  let lastGroup = '';
+
+  for (const room of CONFIG.rooms) {
+    // Group separator row
+    if (room.group !== lastGroup) {
+      lastGroup = room.group;
+      const gtr = document.createElement('tr');
+      gtr.innerHTML = `<td colspan="4" style="background:#d8e8f8;font-size:11px;font-weight:bold;color:#1a4b8a;padding:4px 8px;border-bottom:1px solid #9ab0d8;">
+        ${room.group === 'lec' ? '▶ 講義室' : '▶ 治療演習室'}
+      </td>`;
+      tbody.appendChild(gtr);
+    }
+
+    let totalMin = 0, count = 0;
+    for (const d of weekDates) {
+      const ds = dateToStr(d);
+      for (const r of (state.weeklyData[ds] || [])) {
+        if (r.roomId === room.id && r.status !== 'キャンセル済み') {
+          totalMin += toMin(r.end) - toMin(r.start);
+          count++;
+        }
+      }
+    }
+    grandMin += totalMin;
+    grandCount += count;
+
+    const occ = availMinPerRoom > 0 ? (totalMin / availMinPerRoom * 100) : 0;
+    const occStr = occ.toFixed(1) + '%';
+    const colorClass = occ >= 70 ? 'high' : occ >= 30 ? 'medium' : 'low';
+    const fillPct = Math.min(occ, 100);
+
+    const tr = document.createElement('tr');
+    tr.className = room.group === 'lec' ? 'group-lec' : 'group-tr';
+    tr.innerHTML = `
+      <td>${room.name}</td>
+      <td>${count}</td>
+      <td>${(totalMin/60).toFixed(1)}</td>
+      <td>
+        <span style="display:inline-block;width:44px;text-align:right;margin-right:6px;">${occStr}</span>
+        <span class="occ-bar-wrap">
+          <span class="occ-bar-fill ${colorClass}" style="width:${fillPct}%;"></span>
+        </span>
+      </td>`;
+    tbody.appendChild(tr);
+  }
+
+  // Total row
+  const totalAvailMin = availMinPerRoom * CONFIG.rooms.length;
+  const totalOcc = totalAvailMin > 0 ? (grandMin / totalAvailMin * 100) : 0;
+  const totalOccStr = totalOcc.toFixed(1) + '%';
+  const totalColorClass = totalOcc >= 70 ? 'high' : totalOcc >= 30 ? 'medium' : 'low';
+  const totalFillPct = Math.min(totalOcc, 100);
+
+  const totalTr = document.createElement('tr');
+  totalTr.className = 'total-row';
+  totalTr.innerHTML = `
+    <td>全教室合計</td>
+    <td>${grandCount}</td>
+    <td>${(grandMin/60).toFixed(1)}</td>
+    <td>
+      <span style="display:inline-block;width:44px;text-align:right;margin-right:6px;">${totalOccStr}</span>
+      <span class="occ-bar-wrap">
+        <span class="occ-bar-fill ${totalColorClass}" style="width:${totalFillPct}%;"></span>
+      </span>
+    </td>`;
+  tbody.appendChild(totalTr);
+}
+
+/* ================================================================
+   LOGGING
+   ================================================================ */
+function addLog(action, roomId, name, timeRange) {
+  const room = CONFIG.rooms.find(r => r.id === roomId);
+  const entry = {
+    ts: new Date().toLocaleString('ja-JP', {year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}),
+    action,
+    room: room ? room.name : roomId,
+    name,
+    timeRange,
+  };
+  state.logs.unshift(entry);
+  if (state.logs.length > 50) state.logs.pop();
+  localStorage.setItem('roomCalendarLogs', JSON.stringify(state.logs));
+  renderLog();
+}
+
+function renderLog() {
+  const tbody = document.getElementById('logTbody');
+  const empty = document.getElementById('logEmpty');
+  const table = document.getElementById('logTable');
+  const recent = state.logs.slice(0, 20);
+  if (recent.length === 0) {
+    empty.style.display = 'block'; table.style.display = 'none';
+  } else {
+    empty.style.display = 'none'; table.style.display = 'table';
+    tbody.innerHTML = recent.map(e =>
+      `<tr><td>${e.ts}</td><td>${e.action}</td><td>${e.room}</td><td>${e.name}</td><td>${e.timeRange}</td></tr>`
+    ).join('');
+  }
+}
+
+let logOpen = false;
+function toggleLog() {
+  logOpen = !logOpen;
+  document.getElementById('logBody').style.display = logOpen ? 'block' : 'none';
+  document.getElementById('logToggleText').textContent = logOpen ? '▲ 非表示' : '▼ 表示';
+  if (logOpen) renderLog();
+}
+
+/* ================================================================
+   RENDERING: TIMELINE HEADER
+   ================================================================ */
+function renderTimelineHeader() {
+  const container = document.getElementById('timelineHeader');
+  const visibleHours = CONFIG.operatingHours.end - CONFIG.operatingHours.start;
+  container.innerHTML = '';
+  container.style.minWidth = `${CONFIG.hourWidth * visibleHours}px`;
+  for (let h = CONFIG.operatingHours.start; h < CONFIG.operatingHours.end; h++) {
+    const el = document.createElement('div');
+    el.className = 'hour-label';
+    el.style.minWidth = `${CONFIG.hourWidth}px`;
+    el.textContent = String(h).padStart(2,'0') + ':00';
+    container.appendChild(el);
+  }
+}
+
+/* ================================================================
+   RENDERING: GANTT
+   ================================================================ */
+function pct(minutes) {
+  return (minutes - SCHOOL_START_MIN) * PX_PER_MIN;
+}
+
+function renderGantt() {
+  const roomColW = 160; // px — room name column width
+  const grid = document.getElementById('ganttGrid');
+  grid.innerHTML = '';
+
+  // Build grid-template-columns: room col + one column per segment
+  const segCols = SEGMENTS.map(s => `${(s.endMin - s.startMin) * PX_PER_MIN}px`).join(' ');
+  grid.style.gridTemplateColumns = `${roomColW}px ${segCols}`;
+
+  // ── HEADER ROW ──
+  const corner = document.createElement('div');
+  corner.className = 'gc-corner';
+  corner.textContent = '施設名';
+  grid.appendChild(corner);
+
+  SEGMENTS.forEach(seg => {
+    const lbl = document.createElement('div');
+    if (seg.type === 'period') {
+      const p = PERIODS[seg.period - 1];
+      lbl.className = 'gc-hour';
+      lbl.innerHTML =
+        `<div>${p.label}</div><div class="gc-hour-time">${p.start}〜${p.end}</div>`;
+    } else {
+      lbl.className = 'gc-break';
+    }
+    grid.appendChild(lbl);
+  });
+
+  // ── ROOM ROWS ──
+  const deptMap = { 'PT':'dept-pt', 'OT':'dept-ot', '事務':'dept-jimu', 'その他':'dept-other' };
+  let lastGroup = '';
+  let groupIdx  = { lec: 0, tr: 0 };
+
+  CONFIG.rooms.forEach(room => {
+    // Group separator
+    if (room.group !== lastGroup) {
+      lastGroup = room.group;
+      groupIdx[room.group] = 0;
+      const sep = document.createElement('div');
+      sep.className = 'gc-group';
+      sep.style.gridColumn = `1 / -1`;
+      sep.textContent = room.group === 'lec' ? '■ 講義室' : '■ 治療演習室';
+      grid.appendChild(sep);
+    }
+
+    const idx = groupIdx[room.group]++;
+    const rowColor = room.group === 'lec'
+      ? (idx % 2 === 0 ? 'lec-odd' : 'lec-even')
+      : (idx % 2 === 0 ? 'tr-odd'  : 'tr-even');
+
+    // Room cell (sticky left)
+    const roomCell = document.createElement('div');
+    roomCell.className = `gc-room ${rowColor}`;
+
+    const link = document.createElement('a');
+    link.className = 'room-name-link';
+    link.textContent = room.name;
+    link.title = room.name;
+    link.onclick = () => showRoomInfo(room);
+
+    const btn = document.createElement('button');
+    btn.className = 'btn-reserve';
+    btn.textContent = '予約';
+    btn.onclick = () => openReserveModal(room, dateToStr(state.currentDate));
+
+    roomCell.appendChild(link);
+    roomCell.appendChild(btn);
+    grid.appendChild(roomCell);
+
+    // Timeline cell (spans all hour columns)
+    const tl = document.createElement('div');
+    tl.className = `gc-timeline ${rowColor}`;
+    tl.style.gridColumn = `2 / -1`;
+
+    state.reservations.filter(r => r.roomId === room.id).forEach(res => {
+      const cls = deptMap[res.dept] || 'dept-other';
+      const startMin = toMin(res.start);
+      const endMin   = toMin(res.end);
+      const block = document.createElement('div');
+      block.className = `res-block ${cls}`;
+      block.style.left  = `${pct(startMin)}px`;
+      block.style.width = `${Math.max((endMin - startMin) * PX_PER_MIN - 2, 4)}px`;
+      block.textContent = res.name;
+      block.addEventListener('click', e => { e.stopPropagation(); showDetail(res); });
+      block.addEventListener('mouseenter', e => showTip(e, res));
+      block.addEventListener('mousemove',  e => moveTip(e));
+      block.addEventListener('mouseleave', hideTip);
+      tl.appendChild(block);
+    });
+
+    grid.appendChild(tl);
+  });
+}
+
+/* ================================================================
+   MINI CALENDAR
+   ================================================================ */
+function renderMiniCal() {
+  const d     = state.calendarViewDate;
+  const year  = d.getFullYear(), month = d.getMonth();
+
+  // ── Header with prev / next month buttons ──
+  const header = document.getElementById('miniCalHeader');
+  header.innerHTML = '';
+
+  const prevBtn = document.createElement('button');
+  prevBtn.className = 'mini-cal-nav';
+  prevBtn.textContent = '◀';
+  prevBtn.onclick = () => {
+    state.calendarViewDate = new Date(year, month - 1, 1);
+    renderMiniCal();
+  };
+
+  const title = document.createElement('span');
+  title.textContent = `${year}年 ${jpMonths[month]}`;
+
+  const nextBtn = document.createElement('button');
+  nextBtn.className = 'mini-cal-nav';
+  nextBtn.textContent = '▶';
+  nextBtn.onclick = () => {
+    state.calendarViewDate = new Date(year, month + 1, 1);
+    renderMiniCal();
+  };
+
+  header.appendChild(prevBtn);
+  header.appendChild(title);
+  header.appendChild(nextBtn);
+
+  // ── Calendar grid ──
+  const grid = document.getElementById('miniCalGrid');
+  grid.innerHTML = '';
+  ['日','月','火','水','木','金','土'].forEach((dow, i) => {
+    const el = document.createElement('div');
+    el.className = 'mini-cal-dow' + (i===0?' sun':i===6?' sat':'');
+    el.textContent = dow;
+    grid.appendChild(el);
+  });
+  const firstDay    = new Date(year, month, 1).getDay();
+  const daysInMonth = new Date(year, month+1, 0).getDate();
+  const todayStr    = dateToStr(new Date());
+  const selStr      = dateToStr(state.currentDate);
+  for (let i = 0; i < firstDay; i++) {
+    const el = document.createElement('div');
+    el.className = 'mini-cal-day empty';
+    grid.appendChild(el);
+  }
+  for (let day = 1; day <= daysInMonth; day++) {
+    const dt  = new Date(year, month, day);
+    const str = dateToStr(dt);
+    const dow = dt.getDay();
+    const el  = document.createElement('div');
+    let cls   = 'mini-cal-day';
+    if (str === todayStr) cls += ' today';
+    if (str === selStr)   cls += ' selected';
+    if (dow === 0) cls += ' sun';
+    if (dow === 6) cls += ' sat';
+    el.className = cls;
+    el.textContent = day;
+    el.onclick = () => {
+      state.currentDate = new Date(year, month, day);
+      state.calendarViewDate = new Date(year, month, day);
+      state.weeklyData = null;
+      state.weeklyOccKey = null;
+      refresh();
+      if (occOpen) loadWeeklyOccData().then(() => renderOccupancyTable());
+    };
+    grid.appendChild(el);
+  }
+}
+
+/* ================================================================
+   STATUS DATE
+   ================================================================ */
+function renderStatusDate() {
+  document.getElementById('statusDate').textContent =
+    `教室予約状況　${fmtJP(state.currentDate)}`;
+}
+
+/* ================================================================
+   NAVIGATION
+   ================================================================ */
+async function refresh() {
+  renderStatusDate();
+  renderMiniCal();
+  await loadReservations(dateToStr(state.currentDate));
+  renderGantt();
+}
+
+function changeDate(d) {
+  const nd = new Date(state.currentDate);
+  nd.setDate(nd.getDate() + d);
+  state.currentDate = nd;
+  state.calendarViewDate = new Date(nd);
+  // Invalidate weekly cache
+  state.weeklyData = null;
+  state.weeklyOccKey = null;
+  refresh();
+  if (occOpen) loadWeeklyOccData().then(() => renderOccupancyTable());
+}
+function goToday() {
+  state.currentDate = new Date();
+  state.calendarViewDate = new Date();
+  state.weeklyData = null;
+  state.weeklyOccKey = null;
+  refresh();
+  if (occOpen) loadWeeklyOccData().then(() => renderOccupancyTable());
+}
+
+/* ================================================================
+   RESERVE MODAL
+   ================================================================ */
+function openReserveModal(room, dateStr) {
+  // Check next-week entry restriction (Fri/Sat/Sun → next week blocked)
+  if (isNextWeekRestricted(dateStr)) {
+    alert('⚠️ 次週の予約は木曜日までにお申し込みください。\n金曜日以降は翌週の予約受付を締め切っています。');
+    return;
+  }
+
+  const sel = document.getElementById('f_room');
+  sel.innerHTML = CONFIG.rooms.map(r =>
+    `<option value="${r.id}"${r.id===room.id?' selected':''}>${r.name}</option>`
+  ).join('');
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const maxByRule = getMaxReservationDate();
+  const absMax    = new Date(today);
+  absMax.setDate(today.getDate() + CONFIG.maxAdvanceDays);
+  const maxDate   = maxByRule < absMax ? maxByRule : absMax;
+
+  const di = document.getElementById('f_date');
+  di.min = dateToStr(today); di.max = dateToStr(maxDate); di.value = dateStr;
+
+  buildTimes('f_start');
+  buildTimes('f_end');
+
+  document.getElementById('f_name').value    = state.currentUser.name || '';
+  document.getElementById('f_dept').value    = '';
+  document.getElementById('f_class').value   = '';
+  document.getElementById('f_purpose').value = '';
+  document.getElementById('reserveError').classList.remove('visible');
+  document.getElementById('reserveSuccess').classList.remove('visible');
+  openModal('reserveModal');
+}
+
+function buildTimes(id) {
+  const sel = document.getElementById(id);
+  sel.innerHTML = '<option value="">選択</option>';
+  PERIOD_TIMES.forEach(t => {
+    const opt = document.createElement('option');
+    opt.value = t.value;
+    opt.textContent = t.label;
+    sel.appendChild(opt);
+  });
+}
+
+/* Returns the max date allowed for reservation based on next-week rule */
+function getMaxReservationDate() {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const dow = today.getDay(); // 0=Sun,1=Mon,...,5=Fri,6=Sat
+  const thisWeekDates = getWeekDates(today);
+  const thisWeekSun = thisWeekDates[6];
+  // Fri/Sat/Sun → cannot book next week → max = this week's Sunday
+  if (dow === 5 || dow === 6 || dow === 0) {
+    return thisWeekSun;
+  }
+  // Mon–Thu → can book next week → max = next week's Sunday
+  const nextWeekSun = new Date(thisWeekDates[0]);
+  nextWeekSun.setDate(thisWeekDates[0].getDate() + 13);
+  return nextWeekSun;
+}
+
+/* Returns true if the given dateStr is in "next week" and today is Fri/Sat/Sun */
+function isNextWeekRestricted(selDateStr) {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const todayDow = today.getDay();
+  const thisWeekDates = getWeekDates(today);
+  const nextWeekMon = new Date(thisWeekDates[0]);
+  nextWeekMon.setDate(thisWeekDates[0].getDate() + 7);
+  const nextWeekSun = new Date(nextWeekMon);
+  nextWeekSun.setDate(nextWeekMon.getDate() + 6);
+  const selDate = strToDate(selDateStr);
+  selDate.setHours(0, 0, 0, 0);
+  if (selDate >= nextWeekMon && selDate <= nextWeekSun) {
+    return todayDow === 5 || todayDow === 6 || todayDow === 0;
+  }
+  return false;
+}
+
+function openModal(id) {
+  // iOS fix: freeze body scroll when modal opens to prevent keyboard-triggered layout jumps
+  if (document.body.style.position !== 'fixed') {
+    const scrollY = window.scrollY;
+    document.body._modalScrollY = scrollY;
+    document.body.style.position = 'fixed';
+    document.body.style.top = `-${scrollY}px`;
+    document.body.style.width = '100%';
+    document.body.style.overflow = 'hidden';
+  }
+  document.getElementById(id).classList.add('open');
+}
+function closeModal(id) {
+  document.getElementById(id).classList.remove('open');
+  if (!document.querySelector('.modal-overlay.open')) {
+    const scrollY = document.body._modalScrollY || 0;
+    document.body.style.position = '';
+    document.body.style.top = '';
+    document.body.style.width = '';
+    document.body.style.overflow = '';
+    document.body._modalScrollY = 0;
+    window.scrollTo(0, scrollY);
+  }
+}
+
+function hasDuplicate(roomId, dateStr, start, end, excludeId=null) {
+  const s = toMin(start), e = toMin(end);
+  return state.reservations.some(r =>
+    r.id !== excludeId && r.roomId === roomId &&
+    r.date === dateStr && r.status !== 'キャンセル済み' &&
+    s < toMin(r.end) && e > toMin(r.start)
+  );
+}
+
+async function submitReservation() {
+  const errEl = document.getElementById('reserveError');
+  const sucEl = document.getElementById('reserveSuccess');
+  errEl.classList.remove('visible'); sucEl.classList.remove('visible');
+
+  const v = {
+    roomId:  document.getElementById('f_room').value,
+    date:    document.getElementById('f_date').value,
+    start:   document.getElementById('f_start').value,
+    end:       document.getElementById('f_end').value,
+    name:      document.getElementById('f_name').value.trim(),
+    dept:      document.getElementById('f_dept').value,
+    classType: document.getElementById('f_class').value,
+    email:     state.currentUser.email || '',
+    purpose:   document.getElementById('f_purpose').value.trim(),
+  };
+
+  const errs = [];
+  if (!v.roomId) errs.push('施設を選択してください。');
+  if (!v.date)   errs.push('利用日を入力してください。');
+  if (!v.start)  errs.push('開始時刻を選択してください。');
+  if (!v.end)    errs.push('終了時刻を選択してください。');
+  if (!v.name)   errs.push('予約者氏名を入力してください。');
+  if (!v.dept)      errs.push('所属を選択してください。');
+  if (!v.classType) errs.push('授業区分を選択してください。');
+  if (v.start && v.end && toMin(v.start) >= toMin(v.end)) errs.push('終了時刻は開始時刻より後にしてください。');
+
+  if (v.date) {
+    const sel = strToDate(v.date);
+    const tod = new Date(); tod.setHours(0,0,0,0);
+    const max = new Date(tod); max.setDate(max.getDate() + CONFIG.maxAdvanceDays);
+    if (sel < tod) errs.push('⚠️ 予約できません：過去の日付には予約できません。');
+    if (sel > max) errs.push(`予約は${CONFIG.maxAdvanceDays}日先（約3ヶ月）まで申請できます。`);
+    if (isNextWeekRestricted(v.date)) {
+      errs.push('⚠️ 予約できません：次週の予約は木曜日までにお申し込みください（金曜日以降は翌週の予約受付を締め切ります）。');
+    }
+  }
+
+  if (errs.length) { errEl.innerHTML = errs.join('<br>'); errEl.classList.add('visible'); return; }
+
+  if (hasDuplicate(v.roomId, v.date, v.start, v.end)) {
+    errEl.innerHTML = '⚠️ 予約できません：この時間帯はすでに予約が入っています。別の日時または施設をご選択ください。';
+    errEl.classList.add('visible'); return;
+  }
+
+  showLoading(true);
+  const res = await saveReservation(v);
+  showLoading(false);
+
+  if (res.success) {
+    state.weeklyData = null;
+    state.weeklyOccKey = null;
+    closeModal('reserveModal');
+    await loadReservations(dateToStr(state.currentDate));
+    renderGantt();
+    alert('✅ 予約が完了しました');
+  } else {
+    errEl.innerHTML = `保存に失敗しました: ${res.error}`;
+    errEl.classList.add('visible');
+  }
+}
+
+/* ================================================================
+   DETAIL MODAL
+   ================================================================ */
+function showDetail(res) {
+  state.selectedReservation = res;
+  const room    = CONFIG.rooms.find(r => r.id === res.roomId) || { name: res.roomId };
+  const user    = state.currentUser || {};
+  const isOwner = user.id && res.createdById && String(res.createdById) === String(user.id);
+  const isAdmin = user.role === '管理者';
+  document.getElementById('detailTitle').textContent = `📋 予約詳細 [${res.id}]`;
+  document.getElementById('detailTable').innerHTML = [
+    ['施設', room.name], ['予約ID', res.id], ['利用日', res.date],
+    ['時間', `${res.start} 〜 ${res.end}`], ['予約者', res.name],
+    ['所属', res.dept||'—'], ['授業区分', res.classType||'—'],
+    ['備考', res.purpose||'—'], ['ステータス', res.status],
+  ].map(([k,v]) => `<tr><th>${k}</th><td>${v}</td></tr>`).join('');
+  const cb = document.getElementById('detailCancelBtn');
+  cb.style.display = (isOwner || isAdmin) && res.status !== 'キャンセル済み'
+    ? 'inline-block' : 'none';
+  openModal('detailModal');
+}
+
+async function cancelReservation() {
+  const res = state.selectedReservation;
+  if (!res || !confirm(`この予約をキャンセルしますか？\n${res.id}  ${res.start}〜${res.end}`)) return;
+
+  // デモモード
+  if (!CONFIG.scriptUrl) {
+    res.status = 'キャンセル済み';
+    const saved = JSON.parse(localStorage.getItem('demoReservations') || '{}');
+    if (saved[res.date]) {
+      const idx = saved[res.date].findIndex(r => r.id === res.id);
+      if (idx !== -1) { saved[res.date][idx].status = 'キャンセル済み'; localStorage.setItem('demoReservations', JSON.stringify(saved)); }
+    }
+    addLog('キャンセル', res.roomId, res.name, `${res.start}〜${res.end}`);
+    state.weeklyData = null; state.weeklyOccKey = null;
+    closeModal('detailModal'); renderGantt();
+    return;
+  }
+
+  // GAS API 経由
+  showLoading(true);
+  try {
+    const result = await callAPI('cancelReservation', { reservationId: res.id });
+    if (result.success) {
+      addLog('キャンセル', res.roomId, res.name, `${res.start}〜${res.end}`);
+      state.weeklyData = null; state.weeklyOccKey = null;
+      closeModal('detailModal');
+      await loadReservations(dateToStr(state.currentDate));
+      renderGantt();
+    } else {
+      alert(result.error || 'キャンセルに失敗しました。');
+    }
+  } catch(e) {
+    alert('エラーが発生しました: ' + e.message);
+  } finally { showLoading(false); }
+}
+
+/* ================================================================
+   ROOM INFO MODAL
+   ================================================================ */
+function showRoomInfo(room) {
+  const groupLabel = room.group === 'lec' ? '講義室' : '治療演習室';
+
+  // Count reservations for this room from logs
+  const roomLogs = state.logs.filter(l => l.room === room.name && l.action === '予約申請');
+
+  document.getElementById('roomModalTitle').textContent = `🏢 ${room.name}`;
+  document.getElementById('roomModalBody').innerHTML = `
+    <table class="detail-table">
+      <tr><th>施設名</th><td>${room.name}</td></tr>
+      <tr><th>区分</th><td>${groupLabel}</td></tr>
+      <tr><th>収容人数</th><td>${room.capacity}名</td></tr>
+      <tr><th>利用可能時間</th><td>1限(09:00〜10:30)〜5限(16:20〜17:50)</td></tr>
+      <tr><th>予約可能期間</th><td>当日〜${CONFIG.maxAdvanceDays}日先（約3ヶ月）</td></tr>
+      <tr><th>申込方法</th><td>「予約」ボタンより申請。管理者が確定後「確定予約」に変わります。</td></tr>
+      <tr><th>累計申請数</th><td>${roomLogs.length}件（操作ログより）</td></tr>
+    </table>`;
+  openModal('roomModal');
+}
+
+/* ================================================================
+   TOOLTIP
+   ================================================================ */
+function showTip(e, res) {
+  const room = CONFIG.rooms.find(r => r.id === res.roomId) || { name: res.roomId };
+  document.getElementById('tooltip').innerHTML =
+    `<strong>${room.name}</strong><br>🕐 ${res.start} 〜 ${res.end}<br>` +
+    `👤 ${res.name}${res.dept?' ['+res.dept+']':''}` +
+    `${res.classType?'<br>📚 '+res.classType:''}<br>📌 ${res.status}` +
+    `${res.purpose?'<br>📝 '+res.purpose:''}`;
+  document.getElementById('tooltip').classList.add('visible');
+  moveTip(e);
+}
+function moveTip(e) {
+  const t = document.getElementById('tooltip');
+  t.style.left = Math.min(e.clientX+14, window.innerWidth-270)+'px';
+  t.style.top  = Math.min(e.clientY+14, window.innerHeight-130)+'px';
+}
+function hideTip() { document.getElementById('tooltip').classList.remove('visible'); }
+
+/* ================================================================
+   LOADING
+   ================================================================ */
+function showLoading(v) { document.getElementById('loadingOverlay').classList.toggle('visible',v); }
+
+/* ================================================================
+   INIT
+   ================================================================ */
+function setupModalListeners() {
+  document.querySelectorAll('.modal-overlay').forEach(el => {
+    let downOnOverlay = false;
+    el.addEventListener('mousedown', e => { downOnOverlay = (e.target === el); });
+    el.addEventListener('mouseup',   e => {
+      if (downOnOverlay && e.target === el) closeModal(el.id);
+      downOnOverlay = false;
+    });
+    el.addEventListener('touchstart', e => { downOnOverlay = (e.target === el); }, {passive:true});
+    el.addEventListener('touchend',   e => {
+      if (downOnOverlay) closeModal(el.id);
+      downOnOverlay = false;
+    });
+  });
+}
+
+async function init() {
+  // scriptUrl 未設定 → デモモード（ログインなし）
+  if (!CONFIG.scriptUrl) {
+    state.currentUser = { id: 'demo', email: 'demo@example.com', name: 'デモユーザー', dept: '事務', role: '管理者' };
+    document.getElementById('headerUser').textContent = '👤 デモモード';
+    await refresh();
+    setupModalListeners();
+    return;
+  }
+
+  // セッション確認（ページリロード後も維持）
+  const token   = sessionStorage.getItem('authToken');
+  const userStr = sessionStorage.getItem('currentUser');
+  if (token && userStr) {
+    try {
+      const user = JSON.parse(userStr);
+      state.currentUser = user;
+      document.getElementById('headerUser').textContent =
+        `👤 ${user.name}（${user.dept}）`;
+      document.getElementById('logoutBtn').style.display = 'inline-block';
+      await refresh();
+      setupModalListeners();
+      return;
+    } catch(e) { sessionStorage.clear(); }
+  }
+
+  // ログイン画面を表示
+  document.getElementById('loginOverlay').classList.add('open');
+  document.getElementById('loginPw').addEventListener('keydown', e => {
+    if (e.key === 'Enter') doLogin();
+  });
+  document.getElementById('loginId').addEventListener('keydown', e => {
+    if (e.key === 'Enter') document.getElementById('loginPw').focus();
+  });
+}
+
+document.addEventListener('DOMContentLoaded', init);
+</script>
+</body>
+</html>
