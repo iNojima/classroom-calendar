@@ -336,6 +336,8 @@ html, body {
 .mini-cal-day.sun { color: #cc3300; }
 .mini-cal-day.sat { color: #0066cc; }
 .mini-cal-day.empty, .mini-cal-day.other-month { cursor: default; color: #ccc; }
+.mini-cal-day.out-of-range { cursor: default; color: #bbb; background: #f0f0f0; }
+.mini-cal-day.out-of-range:hover { background: #f0f0f0; }
 .mini-cal-day.selected.sun, .mini-cal-day.selected.sat { color: #fff; }
 
 /* ===== SCROLL HINT ===== */
@@ -1585,6 +1587,8 @@ function renderMiniCal() {
   const daysInMonth = new Date(year, month+1, 0).getDate();
   const todayStr    = dateToStr(new Date());
   const selStr      = dateToStr(state.currentDate);
+  const todayBase   = new Date(); todayBase.setHours(0,0,0,0);
+  const maxDate     = new Date(todayBase); maxDate.setDate(todayBase.getDate() + CONFIG.maxAdvanceDays);
   for (let i = 0; i < firstDay; i++) {
     const el = document.createElement('div');
     el.className = 'mini-cal-day empty';
@@ -1595,21 +1599,25 @@ function renderMiniCal() {
     const str = dateToStr(dt);
     const dow = dt.getDay();
     const el  = document.createElement('div');
+    const isOutOfRange = dt > maxDate;
     let cls   = 'mini-cal-day';
     if (str === todayStr) cls += ' today';
     if (str === selStr)   cls += ' selected';
     if (dow === 0) cls += ' sun';
     if (dow === 6) cls += ' sat';
+    if (isOutOfRange) cls += ' out-of-range';
     el.className = cls;
     el.textContent = day;
-    el.onclick = () => {
-      state.currentDate = new Date(year, month, day);
-      state.calendarViewDate = new Date(year, month, day);
-      state.weeklyData = null;
-      state.weeklyOccKey = null;
-      refresh();
-      if (occOpen) loadWeeklyOccData().then(() => renderOccupancyTable());
-    };
+    if (!isOutOfRange) {
+      el.onclick = () => {
+        state.currentDate = new Date(year, month, day);
+        state.calendarViewDate = new Date(year, month, day);
+        state.weeklyData = null;
+        state.weeklyOccKey = null;
+        refresh();
+        if (occOpen) loadWeeklyOccData().then(() => renderOccupancyTable());
+      };
+    }
     grid.appendChild(el);
   }
 }
@@ -1656,12 +1664,6 @@ function goToday() {
    RESERVE MODAL
    ================================================================ */
 function openReserveModal(room, dateStr) {
-  // Check next-week entry restriction (Fri/Sat/Sun → next week blocked)
-  if (isNextWeekRestricted(dateStr)) {
-    alert('⚠️ 次週の予約は木曜日までにお申し込みください。\n金曜日以降は翌週の予約受付を締め切っています。');
-    return;
-  }
-
   const sel = document.getElementById('f_room');
   sel.innerHTML = CONFIG.rooms.map(r =>
     `<option value="${r.id}"${r.id===room.id?' selected':''}>${r.name}</option>`
@@ -1700,40 +1702,15 @@ function buildTimes(id) {
   });
 }
 
-/* Returns the max date allowed for reservation based on next-week rule */
+/* Returns the max date allowed for reservation (3 months = 90 days ahead) */
 function getMaxReservationDate() {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-  const dow = today.getDay(); // 0=Sun,1=Mon,...,5=Fri,6=Sat
-  const thisWeekDates = getWeekDates(today);
-  const thisWeekSun = thisWeekDates[6];
-  // Fri/Sat/Sun → cannot book next week → max = this week's Sunday
-  if (dow === 5 || dow === 6 || dow === 0) {
-    return thisWeekSun;
-  }
-  // Mon–Thu → can book next week → max = next week's Sunday
-  const nextWeekSun = new Date(thisWeekDates[0]);
-  nextWeekSun.setDate(thisWeekDates[0].getDate() + 13);
-  return nextWeekSun;
+  const maxDate = new Date(today);
+  maxDate.setDate(today.getDate() + CONFIG.maxAdvanceDays);
+  return maxDate;
 }
 
-/* Returns true if the given dateStr is in "next week" and today is Fri/Sat/Sun */
-function isNextWeekRestricted(selDateStr) {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const todayDow = today.getDay();
-  const thisWeekDates = getWeekDates(today);
-  const nextWeekMon = new Date(thisWeekDates[0]);
-  nextWeekMon.setDate(thisWeekDates[0].getDate() + 7);
-  const nextWeekSun = new Date(nextWeekMon);
-  nextWeekSun.setDate(nextWeekMon.getDate() + 6);
-  const selDate = strToDate(selDateStr);
-  selDate.setHours(0, 0, 0, 0);
-  if (selDate >= nextWeekMon && selDate <= nextWeekSun) {
-    return todayDow === 5 || todayDow === 6 || todayDow === 0;
-  }
-  return false;
-}
 
 function openModal(id) {
   // iOS fix: freeze body scroll when modal opens to prevent keyboard-triggered layout jumps
@@ -1802,9 +1779,6 @@ async function submitReservation() {
     const max = new Date(tod); max.setDate(max.getDate() + CONFIG.maxAdvanceDays);
     if (sel < tod) errs.push('⚠️ 予約できません：過去の日付には予約できません。');
     if (sel > max) errs.push(`予約は${CONFIG.maxAdvanceDays}日先（約3ヶ月）まで申請できます。`);
-    if (isNextWeekRestricted(v.date)) {
-      errs.push('⚠️ 予約できません：次週の予約は木曜日までにお申し込みください（金曜日以降は翌週の予約受付を締め切ります）。');
-    }
   }
 
   if (errs.length) { errEl.innerHTML = errs.join('<br>'); errEl.classList.add('visible'); return; }
