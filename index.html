@@ -1129,7 +1129,7 @@ async function loadReservations(dateStr) {
       }
       state.reservations = [];
     }
-  } catch(e) { console.error(e); state.reservations = []; }
+  } catch(e) { console.error(e); /* エラー時は既存データを維持する */ }
   finally { showLoading(false); }
 }
 
@@ -1793,12 +1793,23 @@ async function submitReservation() {
   showLoading(false);
 
   if (res.success) {
+    // 保存成功 → 画面をすぐに更新するため state に直接追加
+    const newRes = {
+      ...v,
+      id: res.reservationId || res.id || `R${v.date.replace(/-/g,'')}-${Date.now()}`,
+      status: res.status || '申請中',
+      createdById: state.currentUser?.id || '',
+    };
+    if (v.date === dateToStr(state.currentDate)) {
+      state.reservations = [...state.reservations, newRes];
+    }
     state.weeklyData = null;
     state.weeklyOccKey = null;
     closeModal('reserveModal');
-    await loadReservations(dateToStr(state.currentDate));
     renderGantt();
     alert('✅ 予約が完了しました');
+    // バックグラウンドでサーバーから再取得（最新IDやステータスに同期）
+    loadReservations(dateToStr(state.currentDate)).then(() => renderGantt());
   } else {
     errEl.innerHTML = `保存に失敗しました: ${res.error}`;
     errEl.classList.add('visible');
