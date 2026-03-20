@@ -1121,16 +1121,34 @@ async function loadReservations(dateStr) {
   try {
     showLoading(true);
     const result = await callAPI('getReservations', { date: dateStr });
+    console.log('[loadReservations] GASレスポンス:', JSON.stringify(result));
     if (result.success) {
       state.reservations = result.reservations;
+      showDiag(`✅ GAS接続OK：${dateStr} の予約 ${result.reservations.length}件 取得`);
     } else {
       if (result.error && result.error.includes('認証')) {
         sessionStorage.clear(); location.reload(); return;
       }
-      state.reservations = [];
+      showDiag(`⚠️ GASエラー：${result.error || '不明なエラー'}`);
+      /* エラー時は既存データを維持する（state.reservations を消さない） */
     }
-  } catch(e) { console.error(e); /* エラー時は既存データを維持する */ }
+  } catch(e) {
+    console.error('[loadReservations] 例外:', e);
+    showDiag(`❌ 通信エラー：${e.message}`);
+  }
   finally { showLoading(false); }
+}
+
+/* 診断メッセージを画面上部に表示する */
+function showDiag(msg) {
+  let el = document.getElementById('diagBar');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'diagBar';
+    el.style.cssText = 'position:fixed;bottom:0;left:0;right:0;z-index:9998;background:#222;color:#fff;font-size:12px;padding:6px 12px;font-family:monospace;';
+    document.body.appendChild(el);
+  }
+  el.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
 }
 
 async function saveReservation(data) {
@@ -1800,16 +1818,20 @@ async function submitReservation() {
       status: res.status || '申請中',
       createdById: state.currentUser?.id || '',
     };
-    if (v.date === dateToStr(state.currentDate)) {
+    const dateMatch = v.date === dateToStr(state.currentDate);
+    console.log('[submitReservation] 予約日:', v.date, '/ 表示中の日付:', dateToStr(state.currentDate), '/ 一致:', dateMatch);
+    console.log('[submitReservation] GASレスポンス:', JSON.stringify(res));
+    if (dateMatch) {
       state.reservations = [...state.reservations, newRes];
+      showDiag(`✅ 予約追加：${v.date} ${v.start}〜${v.end} state件数=${state.reservations.length}`);
+    } else {
+      showDiag(`⚠️ 日付不一致：予約日=${v.date} 表示中=${dateToStr(state.currentDate)}（その日に移動すると表示されます）`);
     }
     state.weeklyData = null;
     state.weeklyOccKey = null;
     closeModal('reserveModal');
     renderGantt();
     alert('✅ 予約が完了しました');
-    // バックグラウンドでサーバーから再取得（最新IDやステータスに同期）
-    loadReservations(dateToStr(state.currentDate)).then(() => renderGantt());
   } else {
     errEl.innerHTML = `保存に失敗しました: ${res.error}`;
     errEl.classList.add('visible');
