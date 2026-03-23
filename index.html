@@ -452,7 +452,47 @@ html, body {
   max-height: 85vh; overflow-y: auto;
   box-shadow: 0 12px 40px rgba(0,0,0,0.3);
   overscroll-behavior: contain;
+  position: relative;
 }
+
+/* ===== IN-MODAL PROGRESS OVERLAY ===== */
+.modal-progress-overlay {
+  display: none;
+  position: absolute; inset: 0;
+  background: #fff;
+  border-radius: 8px;
+  z-index: 20;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 32px 24px;
+  gap: 16px;
+  text-align: center;
+}
+.modal-progress-overlay.visible { display: flex; }
+.modal-progress-title {
+  font-size: 15px; font-weight: bold; color: #333;
+}
+.modal-progress-sub {
+  font-size: 13px; color: #555; min-height: 20px;
+}
+.modal-progress-bar-wrap {
+  width: 100%; background: #e0d5c0;
+  border-radius: 6px; height: 10px; overflow: hidden;
+}
+.modal-progress-bar-fill {
+  height: 10px; background: #7a5c2e;
+  border-radius: 6px;
+  transition: width 0.25s ease;
+}
+.modal-progress-result {
+  width: 100%; padding: 12px 14px;
+  border-radius: 6px; font-size: 13px;
+  line-height: 1.7; text-align: left;
+  display: none;
+}
+.modal-progress-result.success { background: #f0fff4; border: 1px solid #86efac; color: #166534; }
+.modal-progress-result.partial { background: #fffbeb; border: 1px solid #fcd34d; color: #92400e; }
 .modal-header {
   background: #7a5c2e; color: #fff;
   padding: 12px 16px; border-radius: 8px 8px 0 0;
@@ -611,6 +651,45 @@ html, body {
 }
 @keyframes spin { to { transform: rotate(360deg); } }
 
+/* ===== RECURRING RESERVATION ===== */
+.recur-section {
+  background: #f0f0ff;
+  border: 1px solid #c0c0e8;
+  border-radius: 6px;
+  padding: 10px 12px;
+  margin-bottom: 12px;
+}
+.recur-toggle-label {
+  display: flex; align-items: center; gap: 8px;
+  cursor: pointer; user-select: none;
+}
+.recur-toggle-label input[type="checkbox"] {
+  width: 16px; height: 16px; margin: 0; cursor: pointer;
+  accent-color: #4a4aaa; flex-shrink: 0;
+}
+.recur-toggle-text {
+  font-size: 13px; font-weight: bold; color: #3a3a8a;
+}
+.recur-options { margin-top: 10px; }
+.recur-desc {
+  font-size: 12px; color: #555; margin-bottom: 8px; line-height: 1.5;
+}
+.recur-preview {
+  margin-top: 8px; padding: 8px 10px;
+  background: #e8e8ff; border: 1px solid #b0b0e0;
+  border-radius: 4px; font-size: 12px; color: #333;
+  line-height: 1.7;
+}
+.recur-preview.warn {
+  background: #fff8e0; border-color: #e0c040; color: #664400;
+}
+.recur-result {
+  margin-bottom: 12px; padding: 10px 12px;
+  border-radius: 6px; font-size: 12px; line-height: 1.7;
+}
+.recur-result.success { background: #f0fff4; border: 1px solid #86efac; color: #166534; }
+.recur-result.partial { background: #fffbeb; border: 1px solid #fcd34d; color: #92400e; }
+
 /* ===== MOBILE ===== */
 @media (max-width: 680px) {
   .main-wrap { padding: 8px; }
@@ -765,7 +844,20 @@ html, body {
       </div>
       <div class="form-row">
         <label>利用日 <span class="req">*</span></label>
-        <input type="date" id="f_date">
+        <input type="date" id="f_date" oninput="updateRecurPreview()">
+      </div>
+      <!-- 繰り返し予約セクション -->
+      <div class="recur-section">
+        <label class="recur-toggle-label">
+          <input type="checkbox" id="f_recurring" onchange="toggleRecurring()">
+          <span class="recur-toggle-text">🔁 繰り返し予約（任意）</span>
+        </label>
+        <div class="recur-options" id="recurringOptions" style="display:none;">
+          <div class="recur-desc">利用日と同じ曜日で、終了日まで毎週同じ時間帯・同じ教室を一括予約します。</div>
+          <label style="display:block;font-size:12px;font-weight:bold;margin-bottom:4px;color:#5c3d1a;">繰り返し終了日 <span class="req">*</span></label>
+          <input type="date" id="f_recur_end" style="width:100%;border:1px solid #ccc;border-radius:4px;padding:7px 9px;font-size:16px;font-family:inherit;-webkit-appearance:none;" oninput="updateRecurPreview()">
+          <div class="recur-preview" id="recurPreview" style="display:none;"></div>
+        </div>
       </div>
       <div class="form-row form-inline">
         <div>
@@ -813,6 +905,19 @@ html, body {
     <div class="modal-footer">
       <button class="btn-secondary" onclick="closeModal('reserveModal')">キャンセル</button>
       <button class="btn-primary" onclick="submitReservation()">予約</button>
+    </div>
+    <!-- 繰り返し処理中オーバーレイ -->
+    <div class="modal-progress-overlay" id="recurProgressOverlay">
+      <div class="spinner"></div>
+      <div class="modal-progress-title" id="recurProgressTitle">繰り返し予約を処理中...</div>
+      <div style="width:100%;">
+        <div class="modal-progress-bar-wrap">
+          <div class="modal-progress-bar-fill" id="recurProgressFill" style="width:0%;"></div>
+        </div>
+      </div>
+      <div class="modal-progress-sub" id="recurProgressSub"></div>
+      <div class="modal-progress-result" id="recurProgressResult"></div>
+      <button class="btn-primary" id="recurProgressCloseBtn" style="display:none;" onclick="closeModal('reserveModal')">閉じる</button>
     </div>
   </div>
 </div>
@@ -1121,34 +1226,19 @@ async function loadReservations(dateStr) {
   try {
     showLoading(true);
     const result = await callAPI('getReservations', { date: dateStr });
-    console.log('[loadReservations] GASレスポンス:', JSON.stringify(result));
     if (result.success) {
       state.reservations = result.reservations;
-      showDiag(`✅ GAS接続OK：${dateStr} の予約 ${result.reservations.length}件 取得`);
     } else {
       if (result.error && result.error.includes('認証')) {
         sessionStorage.clear(); location.reload(); return;
       }
-      showDiag(`⚠️ GASエラー：${result.error || '不明なエラー'}`);
+      console.warn('[loadReservations] GASエラー:', result.error);
       /* エラー時は既存データを維持する（state.reservations を消さない） */
     }
   } catch(e) {
     console.error('[loadReservations] 例外:', e);
-    showDiag(`❌ 通信エラー：${e.message}`);
   }
   finally { showLoading(false); }
-}
-
-/* 診断メッセージを画面上部に表示する */
-function showDiag(msg) {
-  let el = document.getElementById('diagBar');
-  if (!el) {
-    el = document.createElement('div');
-    el.id = 'diagBar';
-    el.style.cssText = 'position:fixed;bottom:0;left:0;right:0;z-index:9998;background:#222;color:#fff;font-size:12px;padding:6px 12px;font-family:monospace;';
-    document.body.appendChild(el);
-  }
-  el.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
 }
 
 async function saveReservation(data) {
@@ -1706,6 +1796,16 @@ function openReserveModal(room, dateStr) {
   document.getElementById('f_purpose').value = '';
   document.getElementById('reserveError').classList.remove('visible');
   document.getElementById('reserveSuccess').classList.remove('visible');
+  // Reset recurring fields
+  document.getElementById('f_recurring').checked = false;
+  document.getElementById('recurringOptions').style.display = 'none';
+  document.getElementById('f_recur_end').value = '';
+  document.getElementById('recurPreview').style.display = 'none';
+  // Reset progress overlay
+  document.getElementById('recurProgressOverlay').classList.remove('visible');
+  document.getElementById('recurProgressFill').style.width = '0%';
+  document.getElementById('recurProgressResult').style.display = 'none';
+  document.getElementById('recurProgressCloseBtn').style.display = 'none';
   openModal('reserveModal');
 }
 
@@ -1727,6 +1827,84 @@ function getMaxReservationDate() {
   const maxDate = new Date(today);
   maxDate.setDate(today.getDate() + CONFIG.maxAdvanceDays);
   return maxDate;
+}
+
+/* ================================================================
+   RECURRING RESERVATION HELPERS
+   ================================================================ */
+function toggleRecurring() {
+  const checked = document.getElementById('f_recurring').checked;
+  document.getElementById('recurringOptions').style.display = checked ? 'block' : 'none';
+  if (checked) {
+    const maxDate = getMaxReservationDate();
+    document.getElementById('f_recur_end').max = dateToStr(maxDate);
+    updateRecurPreview();
+  }
+}
+
+function getRecurringDates(startDateStr, endDateStr) {
+  const start = strToDate(startDateStr);
+  const end   = strToDate(endDateStr);
+  const dates = [];
+  const cur   = new Date(start);
+  cur.setDate(cur.getDate() + 7);
+  while (cur <= end) {
+    dates.push(dateToStr(cur));
+    cur.setDate(cur.getDate() + 7);
+  }
+  return dates;
+}
+
+function updateRecurPreview() {
+  if (!document.getElementById('f_recurring').checked) return;
+  const startDate = document.getElementById('f_date').value;
+  const endDate   = document.getElementById('f_recur_end').value;
+  const preview   = document.getElementById('recurPreview');
+  if (!startDate || !endDate) { preview.style.display = 'none'; return; }
+  const d1 = strToDate(startDate);
+  const d2 = strToDate(endDate);
+  if (d2 <= d1) {
+    preview.style.display = 'block';
+    preview.className = 'recur-preview warn';
+    preview.textContent = '⚠️ 終了日は利用日より後の日付を指定してください。';
+    return;
+  }
+  const max = getMaxReservationDate();
+  if (d2 > max) {
+    preview.style.display = 'block';
+    preview.className = 'recur-preview warn';
+    preview.textContent = `⚠️ 終了日は ${CONFIG.maxAdvanceDays}日先（${dateToStr(max)}）以内で指定してください。`;
+    return;
+  }
+  const extraDates = getRecurringDates(startDate, endDate);
+  const total = extraDates.length + 1;
+  const dowName = jpDays[d1.getDay()];
+  const allDates = [startDate, ...extraDates];
+  const shown = allDates.slice(0, 5).map(ds => {
+    const dt = strToDate(ds);
+    return `${dt.getMonth()+1}/${dt.getDate()}(${jpDays[dt.getDay()]})`;
+  }).join('・');
+  const suffix = allDates.length > 5 ? `…（全${total}件）` : `（全${total}件）`;
+  preview.style.display = 'block';
+  preview.className = 'recur-preview';
+  preview.innerHTML =
+    `毎週<strong>${dowName}曜日</strong>　計 <strong>${total}件</strong> を予約します。<br>` +
+    `📅 ${shown}${suffix}`;
+}
+
+function hasDuplicateForDateDirect(roomId, dateStr, start, end) {
+  if (dateStr === dateToStr(state.currentDate)) {
+    return hasDuplicate(roomId, dateStr, start, end);
+  }
+  if (!CONFIG.scriptUrl) {
+    const saved = JSON.parse(localStorage.getItem('demoReservations') || '{}');
+    const s = toMin(start), e = toMin(end);
+    return (saved[dateStr] || []).some(r =>
+      r.roomId === roomId && r.status !== 'キャンセル済み' &&
+      s < toMin(r.end) && e > toMin(r.start)
+    );
+  }
+  return false;
 }
 
 
@@ -1770,9 +1948,9 @@ async function submitReservation() {
   errEl.classList.remove('visible'); sucEl.classList.remove('visible');
 
   const v = {
-    roomId:  document.getElementById('f_room').value,
-    date:    document.getElementById('f_date').value,
-    start:   document.getElementById('f_start').value,
+    roomId:    document.getElementById('f_room').value,
+    date:      document.getElementById('f_date').value,
+    start:     document.getElementById('f_start').value,
     end:       document.getElementById('f_end').value,
     name:      document.getElementById('f_name').value.trim(),
     dept:      document.getElementById('f_dept').value,
@@ -1782,14 +1960,26 @@ async function submitReservation() {
   };
 
   const errs = [];
-  if (!v.roomId) errs.push('施設を選択してください。');
-  if (!v.date)   errs.push('利用日を入力してください。');
-  if (!v.start)  errs.push('開始時刻を選択してください。');
-  if (!v.end)    errs.push('終了時刻を選択してください。');
-  if (!v.name)   errs.push('予約者氏名を入力してください。');
+  if (!v.roomId)    errs.push('施設を選択してください。');
+  if (!v.date)      errs.push('利用日を入力してください。');
+  if (!v.start)     errs.push('開始時刻を選択してください。');
+  if (!v.end)       errs.push('終了時刻を選択してください。');
+  if (!v.name)      errs.push('予約者氏名を入力してください。');
   if (!v.dept)      errs.push('所属を選択してください。');
   if (!v.classType) errs.push('授業区分を選択してください。');
-  if (v.start && v.end && toMin(v.start) >= toMin(v.end)) errs.push('終了時刻は開始時刻より後にしてください。');
+  if (v.start && v.end && toMin(v.start) >= toMin(v.end))
+    errs.push('終了時刻は開始時刻より後にしてください。');
+
+  const isRecurring = document.getElementById('f_recurring').checked;
+  const recurEnd    = document.getElementById('f_recur_end').value;
+  if (isRecurring) {
+    if (!recurEnd) errs.push('繰り返し予約の終了日を入力してください。');
+    else if (recurEnd <= v.date) errs.push('繰り返し終了日は利用日より後にしてください。');
+    else {
+      const max = getMaxReservationDate();
+      if (strToDate(recurEnd) > max) errs.push(`繰り返し終了日は${CONFIG.maxAdvanceDays}日先（${dateToStr(max)}）以内で指定してください。`);
+    }
+  }
 
   if (v.date) {
     const sel = strToDate(v.date);
@@ -1801,6 +1991,79 @@ async function submitReservation() {
 
   if (errs.length) { errEl.innerHTML = errs.join('<br>'); errEl.classList.add('visible'); return; }
 
+  // ── 繰り返し予約 ──
+  if (isRecurring) {
+    const extraDates = getRecurringDates(v.date, recurEnd);
+    const allDates   = [v.date, ...extraDates];
+    const dowName    = jpDays[strToDate(v.date).getDay()];
+
+    if (!confirm(`毎週${dowName}曜日　計 ${allDates.length}件 の予約を申請します。よろしいですか？`)) return;
+
+    // モーダル内進捗オーバーレイを表示
+    const overlay    = document.getElementById('recurProgressOverlay');
+    const titleEl    = document.getElementById('recurProgressTitle');
+    const subEl      = document.getElementById('recurProgressSub');
+    const fillEl     = document.getElementById('recurProgressFill');
+    const resultEl   = document.getElementById('recurProgressResult');
+    const closeBtnEl = document.getElementById('recurProgressCloseBtn');
+    titleEl.textContent = `繰り返し予約を処理中... (0 / ${allDates.length}件)`;
+    subEl.textContent   = '';
+    fillEl.style.width  = '0%';
+    resultEl.style.display = 'none';
+    closeBtnEl.style.display = 'none';
+    overlay.classList.add('visible');
+
+    let successCount = 0;
+    const skipped = [];
+
+    for (let i = 0; i < allDates.length; i++) {
+      const dateStr = allDates[i];
+      const dt = strToDate(dateStr);
+      subEl.textContent = `${dt.getMonth()+1}/${dt.getDate()}(${jpDays[dt.getDay()]}) を申請中...`;
+      titleEl.textContent = `繰り返し予約を処理中... (${i} / ${allDates.length}件)`;
+      fillEl.style.width = `${Math.round(i / allDates.length * 100)}%`;
+
+      if (hasDuplicateForDateDirect(v.roomId, dateStr, v.start, v.end)) {
+        skipped.push(dateStr); continue;
+      }
+      const entry = { ...v, date: dateStr };
+      const res = await saveReservation(entry);
+      if (res.success) {
+        successCount++;
+        if (dateStr === dateToStr(state.currentDate)) {
+          const newRes = { ...entry, id: res.reservationId || res.id || `R${dateStr.replace(/-/g,'')}-${Date.now()}`, status: res.status || '申請中', createdById: state.currentUser?.id || '' };
+          state.reservations = [...state.reservations, newRes];
+        }
+      } else {
+        skipped.push(dateStr);
+      }
+    }
+
+    // 完了表示
+    fillEl.style.width = '100%';
+    titleEl.textContent = '予約処理が完了しました';
+    subEl.textContent   = '';
+    state.weeklyData = null; state.weeklyOccKey = null;
+    renderGantt();
+
+    resultEl.style.display = 'block';
+    if (skipped.length === 0) {
+      resultEl.className = 'modal-progress-result success';
+      resultEl.innerHTML = `✅ 繰り返し予約が完了しました。<br>予約件数：<strong>${successCount}件</strong>（毎週${dowName}曜日）`;
+    } else {
+      const skipStr = skipped.slice(0,5).map(ds => {
+        const dt = strToDate(ds); return `${dt.getMonth()+1}/${dt.getDate()}`;
+      }).join('、') + (skipped.length > 5 ? `…他${skipped.length-5}件` : '');
+      resultEl.className = 'modal-progress-result partial';
+      resultEl.innerHTML =
+        `✅ <strong>${successCount}件</strong> 予約完了<br>` +
+        `⚠️ <strong>${skipped.length}件</strong> スキップ（重複または保存失敗）：${skipStr}`;
+    }
+    closeBtnEl.style.display = 'inline-block';
+    return;
+  }
+
+  // ── 通常予約（単発）──
   if (hasDuplicate(v.roomId, v.date, v.start, v.end)) {
     errEl.innerHTML = '⚠️ 予約できません：この時間帯はすでに予約が入っています。別の日時または施設をご選択ください。';
     errEl.classList.add('visible'); return;
@@ -1811,21 +2074,14 @@ async function submitReservation() {
   showLoading(false);
 
   if (res.success) {
-    // 保存成功 → 画面をすぐに更新するため state に直接追加
     const newRes = {
       ...v,
       id: res.reservationId || res.id || `R${v.date.replace(/-/g,'')}-${Date.now()}`,
       status: res.status || '申請中',
       createdById: state.currentUser?.id || '',
     };
-    const dateMatch = v.date === dateToStr(state.currentDate);
-    console.log('[submitReservation] 予約日:', v.date, '/ 表示中の日付:', dateToStr(state.currentDate), '/ 一致:', dateMatch);
-    console.log('[submitReservation] GASレスポンス:', JSON.stringify(res));
-    if (dateMatch) {
+    if (v.date === dateToStr(state.currentDate)) {
       state.reservations = [...state.reservations, newRes];
-      showDiag(`✅ 予約追加：${v.date} ${v.start}〜${v.end} state件数=${state.reservations.length}`);
-    } else {
-      showDiag(`⚠️ 日付不一致：予約日=${v.date} 表示中=${dateToStr(state.currentDate)}（その日に移動すると表示されます）`);
     }
     state.weeklyData = null;
     state.weeklyOccKey = null;
