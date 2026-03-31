@@ -1259,7 +1259,10 @@ async function loadReservations(dateStr) {
     showLoading(true);
     const result = await callAPI('getReservations', { date: dateStr });
     if (result.success) {
-      state.reservations = result.reservations;
+      const _dc = JSON.parse(sessionStorage.getItem('_resDeptCache') || '{}');
+      state.reservations = result.reservations.map(r =>
+        _dc[r.id] ? { ...r, dept: _dc[r.id] } : r
+      );
     } else {
       if (result.error && result.error.includes('認証')) {
         sessionStorage.clear(); location.reload(); return;
@@ -2067,8 +2070,9 @@ async function submitReservation() {
       const res = await saveReservation(entry);
       if (res.success) {
         successCount++;
+        const newRes = { ...entry, id: res.reservationId || res.id || `R${dateStr.replace(/-/g,'')}-${Date.now()}`, status: res.status || '申請中', createdById: state.currentUser?.id || '' };
+        try { const _dc = JSON.parse(sessionStorage.getItem('_resDeptCache')||'{}'); _dc[newRes.id] = entry.dept; sessionStorage.setItem('_resDeptCache', JSON.stringify(_dc)); } catch(e) {}
         if (dateStr === dateToStr(state.currentDate)) {
-          const newRes = { ...entry, id: res.reservationId || res.id || `R${dateStr.replace(/-/g,'')}-${Date.now()}`, status: res.status || '申請中', createdById: state.currentUser?.id || '' };
           state.reservations = [...state.reservations, newRes];
         }
       } else {
@@ -2117,6 +2121,7 @@ async function submitReservation() {
       status: res.status || '申請中',
       createdById: state.currentUser?.id || '',
     };
+    try { const _dc = JSON.parse(sessionStorage.getItem('_resDeptCache')||'{}'); _dc[newRes.id] = v.dept; sessionStorage.setItem('_resDeptCache', JSON.stringify(_dc)); } catch(e) {}
     if (v.date === dateToStr(state.currentDate)) {
       state.reservations = [...state.reservations, newRes];
     }
