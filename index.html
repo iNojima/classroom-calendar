@@ -210,6 +210,10 @@ html, body {
 .gc-room.lec-odd  { background: #fff; }
 .gc-room.tr-even  { background: #eef3ff; }
 .gc-room.tr-odd   { background: #f5f8ff; }
+.gc-room.f3-even  { background: #f0fff4; }
+.gc-room.f3-odd   { background: #f8fffc; }
+.gc-room.parking-even { background: #f5f5f5; }
+.gc-room.parking-odd  { background: #fafafa; }
 
 .room-name-link {
   flex: 1; min-width: 0;
@@ -246,6 +250,10 @@ html, body {
 .gc-timeline.lec-odd  { background: #fff; }
 .gc-timeline.tr-even  { background: #eef3ff; }
 .gc-timeline.tr-odd   { background: #f5f8ff; }
+.gc-timeline.f3-even  { background: #f0fff4; }
+.gc-timeline.f3-odd   { background: #f8fffc; }
+.gc-timeline.parking-even { background: #f5f5f5; }
+.gc-timeline.parking-odd  { background: #fafafa; }
 
 /* Break area shading (PX_PER_MIN=2: break1=180-200, lunch=380-480, break3=660-680, break4=860-880) */
 .gc-timeline::before {
@@ -384,8 +392,10 @@ html, body {
 }
 .occ-table tr:last-child td { border-bottom: none; }
 .occ-table td:first-child { text-align: left; font-weight: bold; }
-.occ-table tr.group-lec td { background: #faf8f4; }
-.occ-table tr.group-tr  td { background: #f5f8ff; }
+.occ-table tr.group-lec     td { background: #faf8f4; }
+.occ-table tr.group-tr      td { background: #f5f8ff; }
+.occ-table tr.group-f3      td { background: #f0fff4; }
+.occ-table tr.group-parking td { background: #f5f5f5; }
 .occ-table tr.total-row td { background: #f0f4fc; font-weight: bold; border-top: 2px solid #9ab0d8; }
 .occ-bar-wrap {
   background: #e0e8f0; border-radius: 4px;
@@ -1015,22 +1025,40 @@ const CONFIG = {
   operatingHours: { start: 9, end: 18 }, // kept for compatibility
   hourWidth: 100,
   rooms: [
-    // 講義室 1〜6
-    { id: 'Lec1', name: '講義室①',    group: 'lec', capacity: 40 },
-    { id: 'Lec2', name: '講義室②',    group: 'lec', capacity: 40 },
-    { id: 'Lec3', name: '講義室③',    group: 'lec', capacity: 40 },
-    { id: 'Lec4', name: '講義室④',    group: 'lec', capacity: 40 },
-    { id: 'Lec5', name: '講義室⑤',    group: 'lec', capacity: 40 },
-    { id: 'Lec6', name: '講義室⑥',    group: 'lec', capacity: 40 },
-    // 治療演習室 1〜8
-    { id: 'Tr1',  name: '治療演習室①', group: 'tr',  capacity: 20 },
-    { id: 'Tr2',  name: '治療演習室②', group: 'tr',  capacity: 20 },
-    { id: 'Tr3',  name: '治療演習室③', group: 'tr',  capacity: 20 },
-    { id: 'Tr4',  name: '治療演習室④', group: 'tr',  capacity: 20 },
-    { id: 'Tr5',  name: '治療演習室⑤', group: 'tr',  capacity: 20 },
-    { id: 'Tr6',  name: '治療演習室⑥', group: 'tr',  capacity: 20 },
-    { id: 'Tr7',  name: '治療演習室⑦', group: 'tr',  capacity: 20 },
-    { id: 'Tr8',  name: '治療演習室⑧', group: 'tr',  capacity: 20 },
+    // 1階
+    { id: 'F1_Undo',   name: '運動解析室',                       group: 'f1', floor: '1F', capacity: 20 },
+    { id: 'F1_Lec1',   name: '講義室①',                         group: 'f1', floor: '1F', capacity: 40 },
+    { id: 'F1_Lec2',   name: '講義室②',                         group: 'f1', floor: '1F', capacity: 40 },
+    { id: 'F1_Sem1',   name: 'セミナー室①',                      group: 'f1', floor: '1F', capacity: 20 },
+    { id: 'F1_Sem2',   name: 'セミナー室②',                      group: 'f1', floor: '1F', capacity: 20 },
+    { id: 'F1_Career', name: '相談・キャリア支援室',              group: 'f1', floor: '1F', capacity: 10 },
+    // 2階
+    { id: 'F2_Sense',  name: '感覚運動演習室',                    group: 'f2', floor: '2F', capacity: 20 },
+    { id: 'F2_Basic',  name: '基礎実習室①～③',                  group: 'f2', floor: '2F', capacity: 30 },
+    { id: 'F2_Lec3',   name: '講義室③',                         group: 'f2', floor: '2F', capacity: 40 },
+    { id: 'F2_Lec4',   name: '講義室④',                         group: 'f2', floor: '2F', capacity: 40 },
+    { id: 'F2_Sem3',   name: 'セミナー室③',                      group: 'f2', floor: '2F', capacity: 20 },
+    { id: 'F2_Sem4',   name: 'セミナー室④',                      group: 'f2', floor: '2F', capacity: 20 },
+    { id: 'F2_Sem5',   name: 'セミナー室⑤',                      group: 'f2', floor: '2F', capacity: 20 },
+    { id: 'F2_Sem6',   name: 'セミナー室⑥',                      group: 'f2', floor: '2F', capacity: 20 },
+    { id: 'F2_Tr1',    name: '治療演習室①',                      group: 'f2', floor: '2F', capacity: 20 },
+    { id: 'F2_Tr2',    name: '治療演習室②',                      group: 'f2', floor: '2F', capacity: 20 },
+    { id: 'F2_ADL',    name: '日常生活活動演習室',                group: 'f2', floor: '2F', capacity: 20 },
+    { id: 'F2_Rec',    name: 'レクリエーション室（多目的実習室）', group: 'f2', floor: '2F', capacity: 30 },
+    // 3階
+    { id: 'F3_Exer',   name: '運動療法演習室',                    group: 'f3', floor: '3F', capacity: 20 },
+    { id: 'F3_Pros',   name: '義肢装具室',                        group: 'f3', floor: '3F', capacity: 20 },
+    { id: 'F3_BsMed',  name: '基礎医学実習室',                    group: 'f3', floor: '3F', capacity: 20 },
+    { id: 'F3_BsMedF', name: '基礎医学実習室前室',                group: 'f3', floor: '3F', capacity: 10 },
+    { id: 'F3_Lec5',   name: '講義室⑤',                         group: 'f3', floor: '3F', capacity: 40 },
+    { id: 'F3_Sem7',   name: 'セミナー室⑦',                      group: 'f3', floor: '3F', capacity: 20 },
+    { id: 'F3_Multi',  name: '多目的会議室',                      group: 'f3', floor: '3F', capacity: 30 },
+    { id: 'F3_Eval',   name: '評価測定室',                        group: 'f3', floor: '3F', capacity: 20 },
+    { id: 'F3_Hydro',  name: '水治療法演習室',                    group: 'f3', floor: '3F', capacity: 20 },
+    // 駐車場
+    { id: 'Park1',     name: '社が丘駐車場1',                     group: 'parking', floor: '駐', capacity: 1 },
+    { id: 'Park18',    name: '社が丘駐車場18',                    group: 'parking', floor: '駐', capacity: 1 },
+    { id: 'Park21',    name: '社が丘駐車場21',                    group: 'parking', floor: '駐', capacity: 1 },
   ]
 };
 
@@ -1320,9 +1348,10 @@ async function downloadWeeklyCSV() {
     rows.push(['グループ', '教室名', '予約件数', '合計予約時間(h)', `稼働率% (÷${(workdays * TOTAL_PERIOD_MINUTES / 60).toFixed(1)}h)`]);
 
     let grandMin = 0, grandCount = 0;
+    const _GL = { f1: '1階', f2: '2階', f3: '3階', parking: '駐車場' };
     let currentGroup = '';
     for (const room of CONFIG.rooms) {
-      const groupLabel = room.group === 'lec' ? '講義室' : '治療演習室';
+      const groupLabel = _GL[room.group] || room.group;
       let totalMin = 0, count = 0;
       for (const d of weekDates) {
         const ds = dateToStr(d);
@@ -1427,9 +1456,10 @@ function renderOccupancyTable() {
     // Group separator row
     if (room.group !== lastGroup) {
       lastGroup = room.group;
+      const _OGL = { f1: '1階', f2: '2階', f3: '3階', parking: '駐車場' };
       const gtr = document.createElement('tr');
       gtr.innerHTML = `<td colspan="4" style="background:#d8e8f8;font-size:11px;font-weight:bold;color:#1a4b8a;padding:4px 8px;border-bottom:1px solid #9ab0d8;">
-        ${room.group === 'lec' ? '▶ 講義室' : '▶ 治療演習室'}
+        ${'▶ ' + (_OGL[room.group] || room.group)}
       </td>`;
       tbody.appendChild(gtr);
     }
@@ -1452,8 +1482,9 @@ function renderOccupancyTable() {
     const colorClass = occ >= 70 ? 'high' : occ >= 30 ? 'medium' : 'low';
     const fillPct = Math.min(occ, 100);
 
+    const _GCM = { f1: 'group-lec', f2: 'group-tr', f3: 'group-f3', parking: 'group-parking' };
     const tr = document.createElement('tr');
-    tr.className = room.group === 'lec' ? 'group-lec' : 'group-tr';
+    tr.className = _GCM[room.group] || 'group-lec';
     tr.innerHTML = `
       <td>${room.name}</td>
       <td>${count}</td>
@@ -1584,8 +1615,10 @@ function renderGantt() {
 
   // ── ROOM ROWS ──
   const deptMap = { 'PT':'dept-pt', 'OT':'dept-ot', '事務':'dept-jimu', 'その他':'dept-other' };
+  const GROUP_LABELS = { f1: '■ 1階', f2: '■ 2階', f3: '■ 3階', parking: '■ 駐車場' };
+  const GROUP_COLOR  = { f1: 'lec', f2: 'tr', f3: 'f3', parking: 'parking' };
   let lastGroup = '';
-  let groupIdx  = { lec: 0, tr: 0 };
+  let groupIdx  = {};
 
   CONFIG.rooms.forEach(room => {
     // Group separator
@@ -1595,14 +1628,13 @@ function renderGantt() {
       const sep = document.createElement('div');
       sep.className = 'gc-group';
       sep.style.gridColumn = `1 / -1`;
-      sep.textContent = room.group === 'lec' ? '■ 講義室' : '■ 治療演習室';
+      sep.textContent = GROUP_LABELS[room.group] || ('■ ' + room.group);
       grid.appendChild(sep);
     }
 
     const idx = groupIdx[room.group]++;
-    const rowColor = room.group === 'lec'
-      ? (idx % 2 === 0 ? 'lec-odd' : 'lec-even')
-      : (idx % 2 === 0 ? 'tr-odd'  : 'tr-even');
+    const prefix = GROUP_COLOR[room.group] || 'lec';
+    const rowColor = idx % 2 === 0 ? `${prefix}-odd` : `${prefix}-even`;
 
     // Room cell (sticky left)
     const roomCell = document.createElement('div');
@@ -2156,7 +2188,8 @@ async function cancelReservation() {
    ROOM INFO MODAL
    ================================================================ */
 function showRoomInfo(room) {
-  const groupLabel = room.group === 'lec' ? '講義室' : '治療演習室';
+  const _RGL = { f1: '1階', f2: '2階', f3: '3階', parking: '駐車場' };
+  const groupLabel = _RGL[room.group] || room.group;
 
   // Count reservations for this room from logs
   const roomLogs = state.logs.filter(l => l.room === room.name && l.action === '予約申請');
@@ -2165,7 +2198,7 @@ function showRoomInfo(room) {
   document.getElementById('roomModalBody').innerHTML = `
     <table class="detail-table">
       <tr><th>施設名</th><td>${room.name}</td></tr>
-      <tr><th>区分</th><td>${groupLabel}</td></tr>
+      <tr><th>階数</th><td>${groupLabel}</td></tr>
       <tr><th>収容人数</th><td>${room.capacity}名</td></tr>
       <tr><th>利用可能時間</th><td>1限(09:00〜10:30)〜5限(16:20〜17:50)</td></tr>
       <tr><th>予約可能期間</th><td>当日〜${CONFIG.maxAdvanceDays}日先（約3ヶ月）</td></tr>
