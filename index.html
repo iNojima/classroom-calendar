@@ -118,6 +118,7 @@ html, body {
 }
 .leg-pt    { background: #2563eb; }
 .leg-ot    { background: #f97316; }
+.leg-godo  { background: #7c3aed; }
 .leg-jimu  { background: #16a34a; }
 .leg-other { background: #9ca3af; }
 .legend-note { font-size: 11px; color: #cc3300; }
@@ -298,6 +299,7 @@ html, body {
 .res-block:hover { opacity: 0.88; box-shadow: 0 3px 8px rgba(0,0,0,0.3); }
 .res-block.dept-pt    { background: #2563eb; }
 .res-block.dept-ot    { background: #f97316; }
+.res-block.dept-godo  { background: #7c3aed; }
 .res-block.dept-jimu  { background: #16a34a; }
 .res-block.dept-other { background: #9ca3af; }
 
@@ -764,6 +766,7 @@ html, body {
     <span style="font-size:12px;font-weight:bold;">凡例（予約）：</span>
     <div class="legend-item"><div class="legend-box leg-pt"></div>PT</div>
     <div class="legend-item"><div class="legend-box leg-ot"></div>OT</div>
+    <div class="legend-item"><div class="legend-box leg-godo"></div>合同</div>
     <div class="legend-item"><div class="legend-box leg-jimu"></div>事務</div>
     <div class="legend-item"><div class="legend-box leg-other"></div>その他</div>
     <span class="legend-note">※教室名をクリックするとご利用情報をご覧いただけます。</span>
@@ -884,11 +887,12 @@ html, body {
         <input type="text" id="f_name" placeholder="例：山田 太郎">
       </div>
       <div class="form-row">
-        <label>所属 <span class="req">*</span></label>
+        <label>対象 <span class="req">*</span></label>
         <select id="f_dept">
           <option value="">選択してください</option>
           <option value="PT">PT</option>
           <option value="OT">OT</option>
+          <option value="合同">合同</option>
           <option value="事務">事務</option>
           <option value="その他">その他</option>
         </select>
@@ -908,8 +912,8 @@ html, body {
         </select>
       </div>
       <div class="form-row">
-        <label>備考</label>
-        <textarea id="f_purpose" placeholder="例：使用機材、特記事項など"></textarea>
+        <label>目的・授業名 <span class="req">*</span></label>
+        <input type="text" id="f_purpose" placeholder="例：PT評価学 第3回、教員会議、自主練習など">
       </div>
     </div>
     <div class="modal-footer">
@@ -1021,7 +1025,7 @@ html, body {
 const CONFIG = {
   sharepointSiteUrl: '',
   scriptUrl: 'https://script.google.com/macros/s/AKfycbwWjgjp8z0Axirz9yZ245fVqIKI8tLAYh-5wR5UOxm6t-Bq36tTXf-XjNCItHvkG8NQfw/exec', // ★ Apps Script Web App の URL をここに貼り付ける
-  maxAdvanceDays: 90,
+  maxAdvanceDays: 122,
   operatingHours: { start: 9, end: 18 }, // kept for compatibility
   hourWidth: 100,
   rooms: [
@@ -1313,7 +1317,7 @@ async function downloadWeeklyCSV() {
     rows.push([`対象期間: ${startLabel} 〜 ${endLabel}`]);
     rows.push([`出力日時: ${new Date().toLocaleString('ja-JP')}`]);
     rows.push([]);
-    rows.push(['日付', '曜日', '教室名', '開始時刻', '終了時刻', '予約者名', '所属', '授業区分', '備考', 'ステータス']);
+    rows.push(['日付', '曜日', '教室名', '開始時刻', '終了時刻', '予約者名', '対象', '授業区分', '目的・授業名', 'ステータス']);
 
     for (const d of weekDates) {
       const ds = dateToStr(d);
@@ -1614,7 +1618,7 @@ function renderGantt() {
   });
 
   // ── ROOM ROWS ──
-  const deptMap = { 'PT':'dept-pt', 'OT':'dept-ot', '事務':'dept-jimu', 'その他':'dept-other' };
+  const deptMap = { 'PT':'dept-pt', 'OT':'dept-ot', '合同':'dept-godo', '事務':'dept-jimu', 'その他':'dept-other' };
   const GROUP_LABELS = { f1: '■ 1階', f2: '■ 2階', f3: '■ 3階', parking: '■ 駐車場' };
   const GROUP_COLOR  = { f1: 'lec', f2: 'tr', f3: 'f3', parking: 'parking' };
   let lastGroup = '';
@@ -1668,7 +1672,7 @@ function renderGantt() {
       block.className = `res-block ${cls}`;
       block.style.left  = `${pct(startMin)}px`;
       block.style.width = `${Math.max((endMin - startMin) * PX_PER_MIN - 2, 4)}px`;
-      block.textContent = res.name;
+      block.textContent = res.purpose || res.name;
       block.addEventListener('click', e => { e.stopPropagation(); showDetail(res); });
       block.addEventListener('mouseenter', e => showTip(e, res));
       block.addEventListener('mousemove',  e => moveTip(e));
@@ -1852,7 +1856,7 @@ function buildTimes(id) {
   });
 }
 
-/* Returns the max date allowed for reservation (3 months = 90 days ahead) */
+/* Returns the max date allowed for reservation (4 months = 122 days ahead) */
 function getMaxReservationDate() {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -1997,8 +2001,9 @@ async function submitReservation() {
   if (!v.start)     errs.push('開始時刻を選択してください。');
   if (!v.end)       errs.push('終了時刻を選択してください。');
   if (!v.name)      errs.push('予約者氏名を入力してください。');
-  if (!v.dept)      errs.push('所属を選択してください。');
+  if (!v.dept)      errs.push('対象を選択してください。');
   if (!v.classType) errs.push('授業区分を選択してください。');
+  if (!v.purpose)   errs.push('目的・授業名を入力してください。');
   if (v.start && v.end && toMin(v.start) >= toMin(v.end))
     errs.push('終了時刻は開始時刻より後にしてください。');
 
@@ -2018,7 +2023,7 @@ async function submitReservation() {
     const tod = new Date(); tod.setHours(0,0,0,0);
     const max = new Date(tod); max.setDate(max.getDate() + CONFIG.maxAdvanceDays);
     if (sel < tod) errs.push('⚠️ 予約できません：過去の日付には予約できません。');
-    if (sel > max) errs.push(`予約は${CONFIG.maxAdvanceDays}日先（約3ヶ月）まで申請できます。`);
+    if (sel > max) errs.push(`予約は${CONFIG.maxAdvanceDays}日先（約4ヶ月）まで申請できます。`);
   }
 
   if (errs.length) { errEl.innerHTML = errs.join('<br>'); errEl.classList.add('visible'); return; }
@@ -2139,8 +2144,8 @@ function showDetail(res) {
   document.getElementById('detailTable').innerHTML = [
     ['施設', room.name], ['予約ID', res.id], ['利用日', res.date],
     ['時間', `${res.start} 〜 ${res.end}`], ['予約者', res.name],
-    ['所属', res.dept||'—'], ['授業区分', res.classType||'—'],
-    ['備考', res.purpose||'—'], ['ステータス', res.status],
+    ['対象', res.dept||'—'], ['授業区分', res.classType||'—'],
+    ['目的・授業名', res.purpose||'—'], ['ステータス', res.status],
   ].map(([k,v]) => `<tr><th>${k}</th><td>${v}</td></tr>`).join('');
   const cb = document.getElementById('detailCancelBtn');
   cb.style.display = (isOwner || isAdmin) && res.status !== 'キャンセル済み'
@@ -2201,7 +2206,7 @@ function showRoomInfo(room) {
       <tr><th>階数</th><td>${groupLabel}</td></tr>
       <tr><th>収容人数</th><td>${room.capacity}名</td></tr>
       <tr><th>利用可能時間</th><td>1限(09:00〜10:30)〜5限(16:20〜17:50)</td></tr>
-      <tr><th>予約可能期間</th><td>当日〜${CONFIG.maxAdvanceDays}日先（約3ヶ月）</td></tr>
+      <tr><th>予約可能期間</th><td>当日〜${CONFIG.maxAdvanceDays}日先（約4ヶ月）</td></tr>
       <tr><th>申込方法</th><td>「予約」ボタンより申請。管理者が確定後「確定予約」に変わります。</td></tr>
       <tr><th>累計申請数</th><td>${roomLogs.length}件（操作ログより）</td></tr>
     </table>`;
@@ -2215,9 +2220,9 @@ function showTip(e, res) {
   const room = CONFIG.rooms.find(r => r.id === res.roomId) || { name: res.roomId };
   document.getElementById('tooltip').innerHTML =
     `<strong>${room.name}</strong><br>🕐 ${res.start} 〜 ${res.end}<br>` +
+    `${res.purpose?'<strong>'+res.purpose+'</strong><br>':''}` +
     `👤 ${res.name}${res.dept?' ['+res.dept+']':''}` +
-    `${res.classType?'<br>📚 '+res.classType:''}<br>📌 ${res.status}` +
-    `${res.purpose?'<br>📝 '+res.purpose:''}`;
+    `${res.classType?'<br>📚 '+res.classType:''}<br>📌 ${res.status}`;
   document.getElementById('tooltip').classList.add('visible');
   moveTip(e);
 }
