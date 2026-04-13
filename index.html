@@ -1025,7 +1025,7 @@ html, body {
 const CONFIG = {
   sharepointSiteUrl: '',
   scriptUrl: 'https://script.google.com/macros/s/AKfycbwWjgjp8z0Axirz9yZ245fVqIKI8tLAYh-5wR5UOxm6t-Bq36tTXf-XjNCItHvkG8NQfw/exec', // ★ Apps Script Web App の URL をここに貼り付ける
-  maxAdvanceDays: 122,
+  maxAdvanceDays: 122, // 後方互換のために残す（ver08以降は年度制限を使用）
   operatingHours: { start: 9, end: 18 }, // kept for compatibility
   hourWidth: 100,
   rooms: [
@@ -1120,6 +1120,21 @@ const state = {
   weeklyData: null,      // { dateStr: [reservations] }
   weeklyOccKey: null,    // dateStr of Monday of loaded week
 };
+
+/* ================================================================
+   FISCAL YEAR UTILS（年度：4月1日〜3月31日）
+   ================================================================ */
+function getFiscalYearRange(baseDate) {
+  const d = baseDate || new Date();
+  const year = d.getFullYear();
+  const month = d.getMonth(); // 0-indexed (3 = April)
+  const fyYear = month >= 3 ? year : year - 1; // 4月以降なら当年度、3月以前なら前年度
+  const start = new Date(fyYear, 3, 1);   // 4月1日
+  const end   = new Date(fyYear + 1, 2, 31); // 翌年3月31日
+  start.setHours(0, 0, 0, 0);
+  end.setHours(0, 0, 0, 0);
+  return { start, end, fyYear };
+}
 
 /* ================================================================
    DATE UTILS
@@ -1698,13 +1713,22 @@ function renderMiniCal() {
   const header = document.getElementById('miniCalHeader');
   header.innerHTML = '';
 
+  const { start: fyStart, end: fyEnd, fyYear } = getFiscalYearRange();
+  // 年度の最初の月（4月）と最後の月（翌年3月）を比較して前後ボタンを制御
+  const fyStartMonth = new Date(fyYear, 3, 1); // 4月1日
+  const fyEndMonth   = new Date(fyYear + 1, 2, 1); // 翌年3月1日
+
   const prevBtn = document.createElement('button');
   prevBtn.className = 'mini-cal-nav';
   prevBtn.textContent = '◀';
-  prevBtn.onclick = () => {
-    state.calendarViewDate = new Date(year, month - 1, 1);
-    renderMiniCal();
-  };
+  const atFyStart = (year === fyStartMonth.getFullYear() && month === fyStartMonth.getMonth());
+  if (atFyStart) { prevBtn.disabled = true; prevBtn.style.opacity = '0.3'; prevBtn.style.cursor = 'default'; }
+  else {
+    prevBtn.onclick = () => {
+      state.calendarViewDate = new Date(year, month - 1, 1);
+      renderMiniCal();
+    };
+  }
 
   const title = document.createElement('span');
   title.textContent = `${year}年 ${jpMonths[month]}`;
@@ -1712,10 +1736,14 @@ function renderMiniCal() {
   const nextBtn = document.createElement('button');
   nextBtn.className = 'mini-cal-nav';
   nextBtn.textContent = '▶';
-  nextBtn.onclick = () => {
-    state.calendarViewDate = new Date(year, month + 1, 1);
-    renderMiniCal();
-  };
+  const atFyEnd = (year === fyEndMonth.getFullYear() && month === fyEndMonth.getMonth());
+  if (atFyEnd) { nextBtn.disabled = true; nextBtn.style.opacity = '0.3'; nextBtn.style.cursor = 'default'; }
+  else {
+    nextBtn.onclick = () => {
+      state.calendarViewDate = new Date(year, month + 1, 1);
+      renderMiniCal();
+    };
+  }
 
   header.appendChild(prevBtn);
   header.appendChild(title);
@@ -1734,8 +1762,7 @@ function renderMiniCal() {
   const daysInMonth = new Date(year, month+1, 0).getDate();
   const todayStr    = dateToStr(new Date());
   const selStr      = dateToStr(state.currentDate);
-  const todayBase   = new Date(); todayBase.setHours(0,0,0,0);
-  const maxDate     = new Date(todayBase); maxDate.setDate(todayBase.getDate() + CONFIG.maxAdvanceDays);
+  const { start: fyStart, end: fyEnd } = getFiscalYearRange();
   for (let i = 0; i < firstDay; i++) {
     const el = document.createElement('div');
     el.className = 'mini-cal-day empty';
@@ -1746,7 +1773,7 @@ function renderMiniCal() {
     const str = dateToStr(dt);
     const dow = dt.getDay();
     const el  = document.createElement('div');
-    const isOutOfRange = dt > maxDate;
+    const isOutOfRange = dt < fyStart || dt > fyEnd;
     let cls   = 'mini-cal-day';
     if (str === todayStr) cls += ' today';
     if (str === selStr)   cls += ' selected';
@@ -1788,8 +1815,12 @@ async function refresh() {
 }
 
 function changeDate(d) {
+  const { start: fyStart, end: fyEnd } = getFiscalYearRange();
   const nd = new Date(state.currentDate);
   nd.setDate(nd.getDate() + d);
+  // 年度外にはみ出ないようにクランプ
+  if (nd < fyStart) { nd.setFullYear(fyStart.getFullYear(), fyStart.getMonth(), fyStart.getDate()); }
+  if (nd > fyEnd)   { nd.setFullYear(fyEnd.getFullYear(),   fyEnd.getMonth(),   fyEnd.getDate()); }
   state.currentDate = nd;
   state.calendarViewDate = new Date(nd);
   // Invalidate weekly cache
@@ -1818,13 +1849,10 @@ function openReserveModal(room, dateStr) {
 
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-  const maxByRule = getMaxReservationDate();
-  const absMax    = new Date(today);
-  absMax.setDate(today.getDate() + CONFIG.maxAdvanceDays);
-  const maxDate   = maxByRule < absMax ? maxByRule : absMax;
+  const { end: fyEnd } = getFiscalYearRange();
 
   const di = document.getElementById('f_date');
-  di.min = dateToStr(today); di.max = dateToStr(maxDate); di.value = dateStr;
+  di.min = dateToStr(today); di.max = dateToStr(fyEnd); di.value = dateStr;
 
   buildTimes('f_start');
   buildTimes('f_end');
@@ -1859,13 +1887,9 @@ function buildTimes(id) {
   });
 }
 
-/* Returns the max date allowed for reservation (4 months = 122 days ahead) */
+/* Returns the max date allowed for reservation (年度末 3月31日) */
 function getMaxReservationDate() {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const maxDate = new Date(today);
-  maxDate.setDate(today.getDate() + CONFIG.maxAdvanceDays);
-  return maxDate;
+  return getFiscalYearRange().end;
 }
 
 /* ================================================================
@@ -1912,7 +1936,7 @@ function updateRecurPreview() {
   if (d2 > max) {
     preview.style.display = 'block';
     preview.className = 'recur-preview warn';
-    preview.textContent = `⚠️ 終了日は ${CONFIG.maxAdvanceDays}日先（${dateToStr(max)}）以内で指定してください。`;
+    preview.textContent = `⚠️ 終了日は年度末（${dateToStr(max)}）以内で指定してください。`;
     return;
   }
   const extraDates = getRecurringDates(startDate, endDate);
@@ -2016,17 +2040,17 @@ async function submitReservation() {
     if (!recurEnd) errs.push('繰り返し予約の終了日を入力してください。');
     else if (recurEnd <= v.date) errs.push('繰り返し終了日は利用日より後にしてください。');
     else {
-      const max = getMaxReservationDate();
-      if (strToDate(recurEnd) > max) errs.push(`繰り返し終了日は${CONFIG.maxAdvanceDays}日先（${dateToStr(max)}）以内で指定してください。`);
+      const fyEnd = getFiscalYearRange().end;
+      if (strToDate(recurEnd) > fyEnd) errs.push(`繰り返し終了日は年度末（${dateToStr(fyEnd)}）以内で指定してください。`);
     }
   }
 
   if (v.date) {
     const sel = strToDate(v.date);
     const tod = new Date(); tod.setHours(0,0,0,0);
-    const max = new Date(tod); max.setDate(max.getDate() + CONFIG.maxAdvanceDays);
+    const { end: fyEnd } = getFiscalYearRange();
     if (sel < tod) errs.push('⚠️ 予約できません：過去の日付には予約できません。');
-    if (sel > max) errs.push(`予約は${CONFIG.maxAdvanceDays}日先（約4ヶ月）まで申請できます。`);
+    if (sel > fyEnd) errs.push(`予約は年度末（${dateToStr(fyEnd)}）まで申請できます。`);
   }
 
   if (errs.length) { errEl.innerHTML = errs.join('<br>'); errEl.classList.add('visible'); return; }
@@ -2211,7 +2235,7 @@ function showRoomInfo(room) {
       <tr><th>階数</th><td>${groupLabel}</td></tr>
       <tr><th>収容人数</th><td>${room.capacity}名</td></tr>
       <tr><th>利用可能時間</th><td>1限(09:00〜10:30)〜5限(16:20〜17:50)</td></tr>
-      <tr><th>予約可能期間</th><td>当日〜${CONFIG.maxAdvanceDays}日先（約4ヶ月）</td></tr>
+      <tr><th>予約可能期間</th><td>当日〜年度末（${dateToStr(getFiscalYearRange().end)}）</td></tr>
       <tr><th>申込方法</th><td>「予約」ボタンより申請。管理者が確定後「確定予約」に変わります。</td></tr>
       <tr><th>累計申請数</th><td>${roomLogs.length}件（操作ログより）</td></tr>
     </table>`;
