@@ -1762,7 +1762,6 @@ function renderMiniCal() {
   const daysInMonth = new Date(year, month+1, 0).getDate();
   const todayStr    = dateToStr(new Date());
   const selStr      = dateToStr(state.currentDate);
-  const { start: fyStart, end: fyEnd } = getFiscalYearRange();
   for (let i = 0; i < firstDay; i++) {
     const el = document.createElement('div');
     el.className = 'mini-cal-day empty';
